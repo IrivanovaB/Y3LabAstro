@@ -32,11 +32,17 @@ reshape_data = np.reshape(clean_data, shape)
 
 # plt.plot(data[1000])
 # plt.show()
-plt.imshow(data, cmap="gray")
-plt.colorbar()
-plt.title("Preprocessing: image after a threshold")
-plt.show()
+# plt.imshow(data, cmap="gray")
+# plt.colorbar()
+# plt.title("Preprocessing: image after a threshold")
+# plt.show()
 
+hist = plt.hist(clean_data, bins="auto")
+plt.xlabel("Pixel Value")
+plt.ylabel("Count")
+plt.xlim(left=1)
+plt.semilogy()
+plt.show()
 
 
 
