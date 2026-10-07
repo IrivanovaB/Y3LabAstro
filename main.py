@@ -63,7 +63,7 @@ class Original(Image):
 class Missing_Mask(Mask):
     def __init__(self, data):
         super().__init__(data)
-        self.data = self.blank_corners_edges(self)
+        self.data = self.blank_corners_edges()
 
     def blank_corners_edges(self): #1 = ignore; #first index = y, second index = x
         """
@@ -98,18 +98,19 @@ class Missing_Mask(Mask):
         self.data[4609:, 0:] = 1
         #right edge
         self.data[0:, 2569:] = 1
-        return self
+        return self.data
 
 def plot_mask_image(image, mask):
-    plt.figure()
+    fig = plt.figure()
     plt.imshow(image.data, cmap="gray")
-    plt.imshow(mask.data, cmap="viridis")
+    plt.imshow(mask.data, cmap="viridis", alpha=0.7)
     plt.show()
+    #return fig
 
 analysis_image = Original(data)
 
 # #example
-# analysis_image.threshold().sobel().plot()
-# mask = Missing_Mask(np.zeros(np.shape(analysis_image)))
-# plot_mask_image(analysis_image, mask)
+analysis_image.threshold().sobel().plot()
+mask = Missing_Mask(np.zeros(np.shape(analysis_image)))
+plot_mask_image(analysis_image, mask)
 
