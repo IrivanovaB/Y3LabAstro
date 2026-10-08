@@ -22,15 +22,15 @@ class Original(Image):
         flat_data = self.data.flatten()
         threshold = np.average(flat_data)
         #clean_data = np.where(flat_data >= threshold, flat_data, np.zeros_like(flat_data))
-        clean_data = np.where(flat_data <= 50000, flat_data, np.zeros_like(flat_data))
+        clean_data = np.where(flat_data <= 32000, flat_data, np.zeros_like(flat_data))
         self.data = np.reshape(clean_data, self.shape)
         return self
 
-    def gaussian(self):
+    def gaussian(self, sigma):
         """
         Applies Gaussian filter for blurring (not sure if it blurs or not but here we go)
         """
-        self.data = ndimage.gaussian_filter(self.data, sigma=5)
+        self.data = ndimage.gaussian_filter(self.data, sigma=sigma)
         return self
 
     def sobel(self):
@@ -109,8 +109,48 @@ def plot_mask_image(image, mask):
 
 analysis_image = Original(data)
 
-# #example
-analysis_image.threshold().sobel().plot()
-mask = Missing_Mask(np.zeros(np.shape(analysis_image)))
-plot_mask_image(analysis_image, mask)
 
+class Flare(Mask):
+    def __init__(self, data):
+        super().__init__(data)
+
+    def central_flare(self, image):
+        average_value = np.average(analysis_image.data)
+
+        #flare bulb centre at [1437, 3213]
+        central_x = 1436
+        line = image.data[:, central_x]
+        self.data[:, 1436] = line
+
+        #going to the right
+        x = central_x + 1
+        right_line = image.data[:, x] 
+
+        while (right_line >= average_value).any():
+            shape = np.where(right_line >= average_value, right_line, np.zeros_like(right_line))
+            self.data[:, x] = shape
+            x += 1
+            right_line = image.data[:, x]
+
+        #going to the left
+        x_left = central_x - 1
+        left_line = image.data[:, x_left]
+        while (left_line >= average_value).any():
+            shape = np.where(left_line >= average_value, left_line, np.zeros_like(left_line))
+            self.data[:, x_left] = shape
+            x_left -= 1
+            left_line = image.data[:, x_left]
+
+
+        self.data = self.data/np.max(self.data) #normed
+
+        plot_mask_image(image, self)
+
+
+flare = Flare(np.zeros(analysis_image.shape))
+flare.central_flare(analysis_image)
+
+# # #example
+# analysis_image.threshold().sobel().plot()
+# mask = Missing_Mask(np.zeros(np.shape(analysis_image)))
+# plot_mask_image(analysis_image, mask)
