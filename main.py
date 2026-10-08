@@ -149,11 +149,15 @@ class MaskedOriginal(Frame):
         # plt.savefig("figures/masked image", dpi=300)
         plt.show()
 
-    def plot_pixel_hist(self):
+    def plot_pixel_hist(self, p0):
         """
         Plots the pixel value histogram of the masked image.
         """
+        def gaussian(x, A, mu, sigma):
+            return A * np.exp(- (x-mu)**2 / (2 * sigma**2))
+        popt, pcov = self.gaussian_fit(p0)
         plt.hist(self.__data__, bins=1000)
+        plt.plot(np.arange(0, 35000, 100), gaussian(np.arange(0, 35000, 100), *popt))
         plt.xlabel("Pixel Value (a.u.)")
         plt.ylabel("Count")
         plt.tight_layout()
@@ -161,12 +165,13 @@ class MaskedOriginal(Frame):
         plt.show()
 
 
-masked_image = MaskedOriginal(data)
-masked_image.plot_pixel_hist()
-fit = masked_image.gaussian_fit(p0=[5e6, 4000, 1000])
+# masked_image = MaskedOriginal(data)
+# masked_image.plot_pixel_hist(p0=[5e6, 4000, 1000])
+# fit = masked_image.gaussian_fit(p0=[5e6, 4000, 1000])
 
-# # #example
-# analysis_image.threshold().sobel().plot()
+# #example
+analysis_image = Original(data)
+analysis_image.threshold().sobel().plot()
 # mask = MissingMask(data)
 # plot_mask_image(analysis_image, mask)
 
