@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Frame:
     """
     Parent class for anything that can constitute a layer.
@@ -11,8 +12,9 @@ class Frame:
             shape of the image data (i.e. dimensions of image)
     """
     def __init__(self, data):
-        self.data = data
-        self.shape = np.shape(data)
+        self.__data__ = data
+        self.__shape__ = np.shape(data)
+
 
 class Image(Frame):
     """
@@ -20,6 +22,7 @@ class Image(Frame):
     """
     def __init__(self, data):
         super().__init__(data)
+
 
 class Mask(Frame):
     """
