@@ -1,7 +1,7 @@
 import numpy as np
 from astropy.io import fits 
 from classes import Frame, Image, Mask
-from scipy import ndimage
+from scipy import optimize, ndimage
 import matplotlib.pyplot as plt
 
 #Read in our analysis image
@@ -120,30 +120,40 @@ class MissingMask(Mask):
 
 class MaskedOriginal(Frame):
     def __init__(self, data):
-        self.__image__ = Original(data)
-        self.__mask__ = MissingMask(data)
-        self.__image_data__ = self.__image__.data()
-        self.__mask_data__ = self.__mask__.data()
-        super().__init__(self.__image_data__[self.__mask_data__ == 1])
+        super().__init__(data)
+        self.__image__ = Original(data).data()
+        self.__mask__ = MissingMask(data).data()
+        self.__data__ = self.__image__[self.__mask__ == 1]
 
     def data(self):
+        print(self.__shape__)
         return self.__data__
+
+    def gaussian_fit(self, p0):
+        """
+        Fits a Gaussian to the pixel value histogram.
+        """
+        def gaussian(x, A, mu, sigma):
+            return A * np.exp(- (x-mu)**2 / (2 * sigma**2))
+        count, pixel = np.histogram(self.__data__, bins=1000)
+        pixel = (pixel[1:] + pixel[:-1]) / 2
+        return optimize.curve_fit(gaussian, xdata=pixel, ydata=count, p0=p0)
 
     def plot(self):
         """
         Plots the masked image.
         """
-        plt.imshow(self.__image_data__, cmap="gray")
-        plt.imshow(self.__mask_data__, cmap="viridis", alpha=0.7)
+        plt.imshow(self.__image__, cmap="gray")
+        plt.imshow(self.__mask__, cmap="viridis", alpha=0.7)
         plt.tight_layout()
         # plt.savefig("figures/masked image", dpi=300)
         plt.show()
 
-    def plot_pixel_histogram(self):
+    def plot_pixel_hist(self):
         """
         Plots the pixel value histogram of the masked image.
         """
-        plt.hist(self.__data__, bins=100)
+        plt.hist(self.__data__, bins=1000)
         plt.xlabel("Pixel Value (a.u.)")
         plt.ylabel("Count")
         plt.tight_layout()
@@ -152,7 +162,8 @@ class MaskedOriginal(Frame):
 
 
 masked_image = MaskedOriginal(data)
-masked_image.plot_pixel_histogram()
+masked_image.plot_pixel_hist()
+fit = masked_image.gaussian_fit(p0=[5e6, 4000, 1000])
 
 # # #example
 # analysis_image.threshold().sobel().plot()
