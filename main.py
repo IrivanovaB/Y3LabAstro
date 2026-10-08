@@ -43,7 +43,7 @@ class Original(Image):
 
         Follows procedure of https://github.com/adamiao/sobel-filter-tutorial/blob/master/sobel_using_scipy.py
         """
-        x_filter, y_filter = ndimage.sobel(self.data, axis=0), ndimage.sobel(self.data, axis=1)
+        x_filter, y_filter = ndimage.sobel(self.__data__, axis=0), ndimage.sobel(self.__data__, axis=1)
         filtered_image = np.hypot(x_filter, y_filter)  
         filtered_image = filtered_image / np.max(filtered_image)  
         self.__data__ = filtered_image
@@ -61,7 +61,7 @@ class Original(Image):
         fig = plt.figure(1)
         ax1, ax2 = fig.add_subplot(121), fig.add_subplot(122)
         ax1.imshow(self.__original__, cmap="gray")
-        ax2.imshow(self.data, cmap=plt.get_cmap('gray'))
+        ax2.imshow(self.__data__, cmap=plt.get_cmap('gray'))
         plt.show()
 
 
@@ -126,7 +126,6 @@ class MaskedOriginal(Frame):
         self.__data__ = self.__image__[self.__mask__ == 1]
 
     def data(self):
-        print(self.__shape__)
         return self.__data__
 
     def gaussian_fit(self, p0):
@@ -143,8 +142,8 @@ class MaskedOriginal(Frame):
         """
         Plots the masked image.
         """
-        plt.imshow(self.__image__, cmap="gray")
-        plt.imshow(self.__mask__, cmap="viridis", alpha=0.7)
+        plt.imshow(self.__image__, cmap="viridis")
+        plt.imshow(self.__mask__, cmap="gray", alpha=0.7)
         plt.tight_layout()
         # plt.savefig("figures/masked image", dpi=300)
         plt.show()
@@ -161,17 +160,10 @@ class MaskedOriginal(Frame):
         plt.xlabel("Pixel Value (a.u.)")
         plt.ylabel("Count")
         plt.tight_layout()
-        # plt.savefig("figures/pixel values histogram of masked image", dpi=300)
+        plt.savefig("figures/fitted pixel values histogram of masked image", dpi=300)
         plt.show()
 
 
-# masked_image = MaskedOriginal(data)
-# masked_image.plot_pixel_hist(p0=[5e6, 4000, 1000])
-# fit = masked_image.gaussian_fit(p0=[5e6, 4000, 1000])
+masked_image = MaskedOriginal(data)
 
-# #example
-analysis_image = Original(data)
-analysis_image.threshold().sobel().plot()
-# mask = MissingMask(data)
-# plot_mask_image(analysis_image, mask)
-
+masked_image.plot_pixel_hist(p0=[5e6, 4000, 1000])
