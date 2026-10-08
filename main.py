@@ -1,6 +1,6 @@
 import numpy as np
 from astropy.io import fits 
-from classes import Image, Mask
+from classes import Frame, Image, Mask
 from scipy import ndimage
 import matplotlib.pyplot as plt
 
@@ -60,7 +60,7 @@ class Original(Image):
     def plot(self):
         fig = plt.figure(1)
         ax1, ax2 = fig.add_subplot(121), fig.add_subplot(122)
-        ax1.imshow(self.original, cmap="gray")
+        ax1.imshow(self.__original__, cmap="gray")
         ax2.imshow(self.data, cmap=plt.get_cmap('gray'))
         plt.show()
 
@@ -112,44 +112,42 @@ class MissingMask(Mask):
         """
         Plots the mask.
         """
-        plt.imshow(self.__mask__.data(), cmap="gray")
+        plt.imshow(self.__data__, cmap="gray")
         plt.tight_layout()
         # plt.savefig("figures/mask", dpi=300)
         plt.show()
 
 
-class MaskedOriginal():
+class MaskedOriginal(Frame):
     def __init__(self, data):
         self.__image__ = Original(data)
         self.__mask__ = MissingMask(data)
         self.__image_data__ = self.__image__.data()
         self.__mask_data__ = self.__mask__.data()
+        super().__init__(self.__image_data__[self.__mask_data__ == 1])
+
+    def data(self):
+        return self.__data__
 
     def plot(self):
         """
         Plots the masked image.
         """
-        # fig = plt.figure()
         plt.imshow(self.__image_data__, cmap="gray")
         plt.imshow(self.__mask_data__, cmap="viridis", alpha=0.7)
         plt.tight_layout()
         # plt.savefig("figures/masked image", dpi=300)
         plt.show()
-        #return fig
 
     def plot_pixel_histogram(self):
         """
         Plots the pixel value histogram of the masked image.
         """
-        flat_image = self.__image_data__.flatten()
-        flat_mask = self.__mask_data__.flatten()
-        flat_image = flat_image[flat_mask]
-        print(flat_image)
-        plt.hist(flat_mask)
+        plt.hist(self.__data__, bins=100)
         plt.xlabel("Pixel Value (a.u.)")
         plt.ylabel("Count")
         plt.tight_layout()
-        plt.savefig("figures/pixel values histogram of masked image", dpi=300)
+        # plt.savefig("figures/pixel values histogram of masked image", dpi=300)
         plt.show()
 
 
