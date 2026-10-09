@@ -238,7 +238,7 @@ class Flare_Bleed(Mask):
                 box = self.data[box_size[1]]
 
         return self
-        
+
 
 def plot_mask_image(image, mask):
     fig = plt.figure()
