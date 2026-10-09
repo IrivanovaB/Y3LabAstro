@@ -1,7 +1,7 @@
 import numpy as np
 from astropy.io import fits 
-from classes import Image, Mask
-from scipy import ndimage
+from classes import Frame, Image, Mask
+from scipy import optimize, ndimage
 import matplotlib.pyplot as plt
 
 #Read in our analysis image
@@ -39,7 +39,7 @@ class Original(Image):
 
         Follows procedure of https://github.com/adamiao/sobel-filter-tutorial/blob/master/sobel_using_scipy.py
         """
-        x_filter, y_filter = ndimage.sobel(self.data, axis=0), ndimage.sobel(self.data, axis=1)
+        x_filter, y_filter = ndimage.sobel(self.__data__, axis=0), ndimage.sobel(self.__data__, axis=1)
         filtered_image = np.hypot(x_filter, y_filter)  
         filtered_image = filtered_image / np.max(filtered_image)  
         self.data = filtered_image
@@ -56,8 +56,8 @@ class Original(Image):
     def plot(self):
         fig = plt.figure(1)
         ax1, ax2 = fig.add_subplot(121), fig.add_subplot(122)
-        ax1.imshow(self.original, cmap="gray")
-        ax2.imshow(self.data, cmap=plt.get_cmap('gray'))
+        ax1.imshow(self.__original__, cmap="gray")
+        ax2.imshow(self.__data__, cmap=plt.get_cmap('gray'))
         plt.show()
 
 
@@ -101,6 +101,14 @@ class MissingMask(Mask):
         self.data[0:, 2569:] = 0
         return self
 
+    def plot(self):
+        """
+        Plots the mask.
+        """
+        plt.imshow(self.__data__, cmap="gray")
+        plt.tight_layout()
+        # plt.savefig("figures/mask", dpi=300)
+        plt.show()
     # def plot(self):
     #     """
     #     Plots the mask.
@@ -118,6 +126,50 @@ class Threshold(Mask):
     def apply_threshold(self):
         return np.where(data >= 36000, np.ones_like(data), np.zeros_like(data))
 
+class MaskedOriginal(Frame):
+    def __init__(self, data):
+        super().__init__(data)
+        self.__image__ = Original(data).data()
+        self.__mask__ = MissingMask(data).data()
+        self.__data__ = self.__image__[self.__mask__ == 1]
+
+    def data(self):
+        return self.__data__
+
+    def gaussian_fit(self, p0):
+        """
+        Fits a Gaussian to the pixel value histogram.
+        """
+        def gaussian(x, A, mu, sigma):
+            return A * np.exp(- (x-mu)**2 / (2 * sigma**2))
+        count, pixel = np.histogram(self.__data__, bins=1000)
+        pixel = (pixel[1:] + pixel[:-1]) / 2
+        return optimize.curve_fit(gaussian, xdata=pixel, ydata=count, p0=p0)
+
+    def plot(self):
+        """
+        Plots the masked image.
+        """
+        plt.imshow(self.__image__, cmap="viridis")
+        plt.imshow(self.__mask__, cmap="gray", alpha=0.7)
+        plt.tight_layout()
+        # plt.savefig("figures/masked image", dpi=300)
+        plt.show()
+
+    def plot_pixel_hist(self, p0):
+        """
+        Plots the pixel value histogram of the masked image.
+        """
+        def gaussian(x, A, mu, sigma):
+            return A * np.exp(- (x-mu)**2 / (2 * sigma**2))
+        popt, pcov = self.gaussian_fit(p0)
+        plt.hist(self.__data__, bins=1000)
+        plt.plot(np.arange(0, 35000, 100), gaussian(np.arange(0, 35000, 100), *popt))
+        plt.xlabel("Pixel Value (a.u.)")
+        plt.ylabel("Count")
+        plt.tight_layout()
+        plt.savefig("figures/fitted pixel values histogram of masked image", dpi=300)
+        plt.show()
 
 class Flare_Bleed(Mask):
     def __init__(self, data):
@@ -203,6 +255,9 @@ flare_mask.flare_region((3213, 1437), analysis_image)
 print(analysis_image.shape())
 plot_mask_image(analysis_image, flare_mask)
 
+masked_image = MaskedOriginal(data)
+
+masked_image.plot_pixel_hist(p0=[5e6, 4000, 1000])
 
 # # #example
 # analysis_image.threshold().sobel().plot()

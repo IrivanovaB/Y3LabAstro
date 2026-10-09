@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Frame:
     """
     Parent class for anything that can constitute a layer.
@@ -27,6 +28,7 @@ class Image(Frame):
 
     def original(self):
         return self.__original__
+
 
 class Mask(Frame):
     """

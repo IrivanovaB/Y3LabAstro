@@ -1,0 +1,40 @@
+import numpy as np
+
+
+class SourceDetector:
+    '''
+    Detects the sources in an image.
+
+    Args:
+        image (MaskedOriginal): The image.
+    '''
+    def __init__(self, image):
+        self.image = image
+        self.data = self.image.data
+        self.__sources__ = []
+        return self
+
+    def sources(self):
+        '''
+        Returns:
+            list: A list of the coordinates of the sources.
+        '''
+        return self.__sources__
+
+    def detector(self):
+        '''
+        Identifies the pixel with the highest intensity, stores its
+        coordinates, and masks it.
+
+        NOTE: The threshold for source detection is currently set at
+        one sigma level above the mean.
+        '''
+        pix_mean = np.mean(self.data)
+        pix_std = np.std(self.data)
+        max_pix_val = np.amax(self.data)
+        if max_pix_val < (pix_mean + 1*pix_std):
+            print('There are no more sources.')
+            return
+        max_pix_coord = np.argmax(self.data)
+        self.__sources__.append(max_pix_coord)
+
