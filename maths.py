@@ -54,4 +54,15 @@ def gaussian_1d_fit(x_data, y_data, p0):
     Returns:
         tuple[arr, arr]: The optimal values and the covariance matrix.
     '''
+    return optimize.curve_fit(gaussian_1d, xdata=x_data, ydata=y_data, p0=p0)
+
+
+def circle(centre, radius):
+    '''
+    Identifies the pixels inside the circle.
+
+    Args:
+        centre (list): The coordinates of the centre of the circle.
+        radius (float): The radius of the circle.
+    '''
 

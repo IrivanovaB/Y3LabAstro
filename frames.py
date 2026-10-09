@@ -5,24 +5,35 @@ A module for the image and mask frames.
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import ndimage
+from copy import deepcopy
 
 
 class Frame:
     """
     Parent class for anything that can constitute a layer.
-
-    Inputs
-        data : numpy array
-            the image data (or layer data)
-        shape : tuple
-            shape of the image data (i.e. dimensions of image)
     """
     def __init__(self, data):
+        '''
+        Args:
+            data (arr): The layer data.
+        '''
         self.data = data
         self.__shape = np.shape(data)
+        self.__original = deepcopy(self.data)
 
     def shape(self):
+        '''
+        Returns:
+            arr: The layer shape.
+        '''
         return self.__shape
+
+    def original(self):
+        '''
+        Returns:
+            arr: The original layer.
+        '''
+        return self.__original
 
 
 class Image(Frame):
@@ -30,11 +41,12 @@ class Image(Frame):
     Child class of Frame. Functions as representing an image layer. 
     """
     def __init__(self, data):
+        '''
+        Args:
+            data (arr): The layer data.
+        '''
         super().__init__(data)
-        self.__original = data
 
-    def original(self):
-        return self.__original
 
     def threshold(self):
         """
@@ -90,7 +102,12 @@ class Mask(Frame):
     Child class of Frame. Functions as a mask overtop of an image.
     """
     def __init__(self, data):
+        '''
+        Args:
+            data (arr): The layer data.
+        '''
         super().__init__(data)
+        self.data = np.ones_like(self.data)
 
 
 class EdgeMask(Mask):
@@ -98,6 +115,10 @@ class EdgeMask(Mask):
     Masks the non-overlapping edges.
     '''
     def __init__(self, data):
+        '''
+        Args:
+            data (arr): The layer data.
+        '''
         super().__init__(data)
         self.blank_corners_edges()
 
@@ -140,7 +161,7 @@ class EdgeMask(Mask):
         """
         Plots the mask.
         """
-        plt.imshow(self.data cmap="gray")
+        plt.imshow(self.data, cmap="gray")
         plt.tight_layout()
         # plt.savefig("figures/mask", dpi=300)
         plt.show()
@@ -151,11 +172,16 @@ class SaturationMask(Mask):
     Masks the pixels above the saturation level.
     '''
     def __init__(self, data):
+        '''
+        Args:
+            data (arr): The layer data.
+        '''
         super().__init__(data)
-        self.data = self.apply_threshold()
+        self.apply_threshold()
 
     def apply_threshold(self):
-        return np.where(self.data >= 36000, np.ones_like(self.data), np.zeros_like(self.data))
+        self.data = np.where(self.data >= 36000, np.ones_like(self.data), np.zeros_like(self.data))
+        return self
 
 
 class BleedingMask(Mask):
@@ -163,6 +189,10 @@ class BleedingMask(Mask):
     Masks the bleeding.
     '''
     def __init__(self, data):
+        '''
+        Args:
+            data (arr): The layer data.
+        '''
         super().__init__(data)
 
     def flare_region(self, flare_centre, image):
@@ -228,3 +258,22 @@ class BleedingMask(Mask):
                 box = self.data[box_size[1]]
 
         return self
+
+
+class CircleMask(Mask):
+    '''
+    Masks a circular region.
+    '''
+    def __init__(self, data, centre, radius):
+        '''
+        Args:
+            data (arr): The layer data.
+            centre (list): The coordinates of the centre of the circle.
+            radius (float): The radius of the circle.
+
+        Returns:
+            list: The coordinates of the pixels inside the circle.
+        '''
+        super().__init__(data)
+        self.__centre = centre
+        self.__radius = radius
