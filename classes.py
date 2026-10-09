@@ -12,7 +12,10 @@ class Frame:
     """
     def __init__(self, data):
         self.data = data
-        self.shape = np.shape(data)
+        self.__shape__ = np.shape(data)
+
+    def shape(self):
+        return self.__shape__
 
 class Image(Frame):
     """
@@ -20,6 +23,10 @@ class Image(Frame):
     """
     def __init__(self, data):
         super().__init__(data)
+        self.__original__ = data
+
+    def original(self):
+        return self.__original__
 
 class Mask(Frame):
     """
