@@ -47,3 +47,7 @@ class SourceDetector:
         max_pix_coord = np.argmax(self.data)
         self.__sources__.append(max_pix_coord)
 
+        
+
+        
+
