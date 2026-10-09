@@ -125,18 +125,68 @@ class Flare_Bleed(Mask):
 
     def flare_region(self, flare_centre, image):
         threshold = np.average(image.data)
-        line = image.data[:, flare_centre]
-        self.data[:, flare_centre] = line
+
+        centre_x = flare_centre[1]
+        centre_y = flare_centre[0]
+
+        # line = image.data[:, centre_x]
+
+        # mask_l_r = Mask(np.zeros(image.shape()))
+
+        # self.data[:, centre_x] = line
 
         #going right
-        x_r = flare_centre + 1
-        right_line = image.data[:, x_r]
-        while (right_line > threshold).any():
-            self.data[:, x_r] = right_line
-            x_r += 1
-            right_line = image.data[:, x_r]
+        # x_r = centre_x + 1
+        # right_line = image.data[:, x_r]
+        # while (right_line > threshold).any():
+        #     right_line = np.where(right_line>threshold, right_line, np.zeros_like(right_line))
+        #     mask_l_r.data[:, x_r] = right_line
+        #     x_r += 1
+        #     right_line = image.data[:, x_r]
 
-        return         
+        # #going left
+        # x_l = centre_x - 1
+        # left_line = image.data[:, x_l]
+        # while (left_line > threshold).any():
+        #     left_line = np.where(left_line>threshold, left_line, np.zeros_like(left_line))
+        #     mask_l_r.data[:, x_l] = left_line
+        #     x_l -= 1
+        #     left_line = image.data[:, x_l]
+
+        #going up
+        line = image.data[centre_y, :]
+        self.data[centre_y, :] = line
+        x_u = centre_y + 1
+        up_line = image.data[x_u, :]
+        while (up_line > threshold).any():
+            up_line = np.where(up_line>threshold, up_line, np.zeros_like(up_line))
+            self.data[x_u, :] = up_line
+            x_u += 1
+            up_line = image.data[x_u, :]
+
+        #going down
+        x_d = centre_y - 1
+        down_line = image.data[x_d, :]
+        while (down_line > threshold).any():
+            down_line = np.where(down_line>threshold, down_line, np.zeros_like(down_line))
+            self.data[x_d, :] = down_line
+            x_d -= 1
+            down_line = image.data[x_d, :]
+
+        self.data = self.data/36000
+
+        return self
+
+    def define_flares(self):
+        box_size = (87, 257) #54 boxes up and 10 boxes along -> 540 total boxes 
+        #fml
+
+        for ix in range(1, 10):
+            for iy in range(1, 54):
+                box = self.data[box_size[1]]
+
+        return self
+        
 
 def plot_mask_image(image, mask):
     fig = plt.figure()
@@ -147,7 +197,11 @@ def plot_mask_image(image, mask):
 
 analysis_image = Original(data)
 mask = Threshold(np.zeros(analysis_image.shape()))
-plot_mask_image(analysis_image, mask)
+flare_mask = Flare_Bleed(mask.data)
+flare_mask.flare_region((3213, 1437), analysis_image)
+
+print(analysis_image.shape())
+plot_mask_image(analysis_image, flare_mask)
 
 
 # # #example
