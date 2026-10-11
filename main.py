@@ -1,32 +1,36 @@
 import numpy as np
-from astropy.io import fits 
-from frames import Frame, Image, Mask
-from scipy import optimize, ndimage
+from astropy.io import fits
 import matplotlib.pyplot as plt
+from image_containers import ImageContainer
 
 #Read in our analysis image
 hdu = fits.open(r"Fits_Data/mosaic.fits")
 data = hdu[0].data
 
-
-def plot_mask_image(image, mask):
-    fig = plt.figure()
-    plt.imshow(image.data, cmap="gray")
-    plt.imshow(mask.data, cmap="viridis", alpha=0.7)
-    plt.show()
+# Plots the histogram.
+mosaic = ImageContainer(image=hdu[0].data)
+mosaic.mask_edge().mask_threshold()
+mosaic.plot_pixel_hist(p0=[3e6, 4000, 1000], zoomed_in=True)
 
 
-analysis_image = Original(data)
-mask = Threshold(np.zeros(analysis_image.shape()))
-flare_mask = Flare_Bleed(mask.data)
-flare_mask.flare_region((3213, 1437), analysis_image)
+# def plot_mask_image(image, mask):
+#     fig = plt.figure()
+#     plt.imshow(image.data, cmap="gray")
+#     plt.imshow(mask.data, cmap="viridis", alpha=0.7)
+#     plt.show()
 
-print(analysis_image.shape())
-plot_mask_image(analysis_image, flare_mask)
 
-masked_image = MaskedOriginal(data)
+# analysis_image = Original(data)
+# mask = Threshold(np.zeros(analysis_image.shape()))
+# flare_mask = Flare_Bleed(mask.data)
+# flare_mask.flare_region((3213, 1437), analysis_image)
 
-masked_image.plot_pixel_hist(p0=[5e6, 4000, 1000])
+# print(analysis_image.shape())
+# plot_mask_image(analysis_image, flare_mask)
+
+# masked_image = MaskedOriginal(data)
+
+# masked_image.plot_pixel_hist(p0=[5e6, 4000, 1000])
 
 # # #example
 # analysis_image.threshold().sobel().plot()

@@ -2,10 +2,10 @@
 A module for the image and mask frames.
 '''
 
+from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import ndimage
-from copy import deepcopy
 
 
 class Frame:
@@ -19,7 +19,6 @@ class Frame:
         '''
         self.data = data
         self.__shape = np.shape(data)
-        self.__original = deepcopy(self.data)
 
     def shape(self):
         '''
@@ -27,13 +26,6 @@ class Frame:
             arr: The layer shape.
         '''
         return self.__shape
-
-    def original(self):
-        '''
-        Returns:
-            arr: The original layer.
-        '''
-        return self.__original
 
 
 class Image(Frame):
@@ -46,7 +38,14 @@ class Image(Frame):
             data (arr): The layer data.
         '''
         super().__init__(data)
+        self.__original = deepcopy(self.data)
 
+    def original(self):
+        '''
+        Returns:
+            arr: The original layer.
+        '''
+        return self.__original
 
     def threshold(self):
         """
@@ -107,7 +106,6 @@ class Mask(Frame):
             data (arr): The layer data.
         '''
         super().__init__(data)
-        self.data = np.ones_like(self.data)
 
 
 class EdgeMask(Mask):
@@ -120,6 +118,7 @@ class EdgeMask(Mask):
             data (arr): The layer data.
         '''
         super().__init__(data)
+        self.data = np.ones_like(self.data)
         self.blank_corners_edges()
 
     def blank_corners_edges(self): #1 = ignore; #first index = y, second index = x
@@ -167,20 +166,24 @@ class EdgeMask(Mask):
         plt.show()
 
 
-class SaturationMask(Mask):
+class ThresholdMask(Mask):
     '''
-    Masks the pixels above the saturation level.
+    Masks the pixels with an intensity above the threshold.
     '''
-    def __init__(self, data):
+    def __init__(self, data, threshold):
         '''
         Args:
             data (arr): The layer data.
+            threshold (int): The threshold.
         '''
         super().__init__(data)
+        self.threshold = threshold
         self.apply_threshold()
 
     def apply_threshold(self):
-        self.data = np.where(self.data >= 36000, np.ones_like(self.data), np.zeros_like(self.data))
+        self.data = np.where(self.data < self.threshold,
+                             np.ones_like(self.data),
+                             np.zeros_like(self.data))
         return self
 
 

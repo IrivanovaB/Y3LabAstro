@@ -54,7 +54,8 @@ def gaussian_1d_fit(x_data, y_data, p0):
     Returns:
         tuple[arr, arr]: The optimal values and the covariance matrix.
     '''
-    return optimize.curve_fit(gaussian_1d, xdata=x_data, ydata=y_data, p0=p0)
+    return optimize.curve_fit(gaussian_1d, xdata=x_data, ydata=y_data, p0=p0,
+                              bounds=[[0, 0, 0], [np.inf, np.inf, np.inf]])
 
 
 def circle(centre, radius):
