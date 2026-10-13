@@ -4,7 +4,7 @@ A module for the image containers composed of layers of frames.
 
 import numpy as np
 import matplotlib.pyplot as plt
-from frames import Image, EdgeMask, ThresholdMask, BleedingMask, CircleMask
+from frames import Image, EdgeMask, ThresholdMask, ImportMask
 from maths import gaussian_1d, gaussian_1d_fit
 
 
@@ -22,14 +22,14 @@ class ImageContainer():
         self.__image = Image(image)
         self.__mask = []
 
-    def mask_edge(self):
+    def edge_mask(self):
         '''
         Adds an EdgeMask.
         '''
         self.__mask.append(EdgeMask(self.__image.data))
         return self
 
-    def mask_threshold(self, threshold=36000):
+    def threshold_mask(self, threshold=36000):
         '''
         Adds a ThresholdMask.
 
@@ -38,6 +38,16 @@ class ImageContainer():
         '''
         self.__mask.append(ThresholdMask(self.__image.data,
                                          threshold=threshold))
+        return self
+
+    def import_mask(self, mask):
+        '''
+        Imports a mask stored as a PNG.
+    
+        Args:
+            mask (arr): The mask to be imported.
+        '''
+        self.__mask.append(ImportMask(mask))
         return self
 
     def select_image_region(self, coord):
@@ -89,7 +99,7 @@ class ImageContainer():
                 Defaults to None.
         '''
         image, masks = self.select_image_region(coord=coord)
-        plt.imshow(image, cmap="viridis")
+        # plt.imshow(image, cmap="viridis")
         for mask in masks:
             plt.imshow(mask, cmap="gray", alpha=0.7)
         plt.tight_layout()
@@ -165,7 +175,7 @@ class ImageContainer():
         plt.ylabel("Count")
         plt.tight_layout()
         if zoomed_in:
-            plt.xlim(left=(popt[1] - 10*popt[2]), right=(popt[1] + 10*popt[2]))
+            plt.xlim(popt[1] - 10*popt[2], popt[1] + 10*popt[2])
             plt.ylim(top=3*popt[0])
         # plt.savefig("figures/masked image histogram", dpi=300)
         plt.show()

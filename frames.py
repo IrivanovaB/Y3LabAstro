@@ -263,20 +263,16 @@ class BleedingMask(Mask):
         return self
 
 
-class CircleMask(Mask):
+class ImportMask(Mask):
     '''
-    Masks a circular region.
+    Imports a mask stored as a PNG.
     '''
-    def __init__(self, data, centre, radius):
+    def __init__(self, data):
         '''
         Args:
-            data (arr): The layer data.
-            centre (list): The coordinates of the centre of the circle.
-            radius (float): The radius of the circle.
-
-        Returns:
-            list: The coordinates of the pixels inside the circle.
+            data (arr): The mask.
         '''
-        super().__init__(data)
-        self.__centre = centre
-        self.__radius = radius
+        super().__init__(np.sum(data[:,:,:3], axis=2))
+        # White pixels have a total value across RGB of 765.
+        self.data = np.where(self.data == 765, np.ones_like(self.data),
+                             np.zeros_like(self.data))
