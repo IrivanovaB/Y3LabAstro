@@ -12,6 +12,7 @@ class SourceDetector:
         self.image = image
         self.data = self.image.data
         self.__sources = []
+        return self
 
     def sources(self):
         '''
@@ -19,6 +20,9 @@ class SourceDetector:
             list: A list of the coordinates of the sources.
         '''
         return self.__sources
+
+    def source_masks(self):
+        return self.__source_masks__
 
     def detector(self):
         '''
@@ -28,12 +32,21 @@ class SourceDetector:
         NOTE: The threshold for source detection is currently set at
         one sigma level above the mean.
         '''
-        pix_mean = np.mean(self.data)
-        pix_std = np.std(self.data)
-        max_pix_val = np.amax(self.data)
+        #image box_size = (87, 257) #54 boxes up and 10 boxes along -> 540 total boxes 
+        #fml
+
+        def segment_stats(box):
+            return np.mean(box), np.std(box), np.amax(box)
+
+        pix_mean, pix_std, max_pix_val = segment_stats(self.data)
+
         if max_pix_val < (pix_mean + 1*pix_std):
             print('There are no more sources.')
             return
         max_pix_coord = np.argmax(self.data)
         self.__sources.append(max_pix_coord)
+
+        
+
+        
 
