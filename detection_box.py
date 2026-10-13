@@ -17,18 +17,63 @@ def find_centre(box_0):
     else: 
         return max_index[0]
 
-def create_box(centre, prev_box):
+def create_box(centre, prev_box, bounds):
     """
     Create a new bounding box based on the previous box info
+
+    bounds: the shape of the image or segment (y, x)
     """
+
     if prev_box == None:
-        return [[centre[0]-3, centre[1]-3], 7, 7] #starting coords of the top left corner, h, w
+        dx = [centre[1] - 3, centre[1] + 3]
+        dy = [centre[0] - 3, centre[0] + 3]
+        if (dx[0] < 0) or (dx[1] > bounds[1]) or (dy[0] < 0) or (dy[1] > bounds[0]):
+            #(dx[0]<0) this means that to the bottom of the centre it goes beyond the image
+            #(dx[1]>bounds[1]) this means that to the top of the centre it goes beyond the image
+            #similarly for dy
+            cs = [0., 0., 0., 0.] #coords (y up, y down, x right, x left)
+            if (dy[1] > bounds[0]):
+                cs[0] = bounds[0]
+            else:
+                cs[0] = dy[1] + 3
+
+            if dy[0] < 0:
+                cs[1] = 0
+            else:
+                cs[1] = dy[0] -3
+
+            if dx[0] > bounds[1]:
+                cs[2] = bounds[1]
+            else:
+                cs[2] = dx[1] + 3
+            
+            if dx[0] < 0:
+                cs[3] = 0
+            else:
+                cs[3] = dx[1] - 3
+
+            h = np.abs(cs[0] - cs[1])
+            w = np.abs(cs[3] - cs[2])
+
+            return [[cs[1], cs[3]], h, w]    #starting in the bottom left (i.e. top left i think) 
+              
+        else:
+            return [[centre[0]-3, centre[1]-3], 7, 7] #starting coords of the top left corner, h, w
         """
         this works
         """
     else:
-        h, w = prev_box[1]+14, prev_box[2]+14
-        return [[prev_box[0][0]-7, prev_box[0][1]-7], h, w]
+        h,w = prev_box[1], prev_box[2]
+        if h!= w: #i.e. working with a box on the edge 
+            c = [prev_box[0][0], prev_box[0][1]] #the corner
+
+            dx = [c[1] - 7, c[1] + 7] #left, right
+            dy = [c[0] - 7, c[0] + 7] #down, up
+
+            #return a new box
+
+        else:
+            return [[prev_box[0][0]-7, prev_box[0][1]-7], h+14, w+14]
 
 
 def get_box_coords(box):
@@ -58,11 +103,30 @@ def plot_box(centre, box):
 
 def get_box_image(segment, box):
     bx, by, bc = get_box_coords(box)
-    return segment[bc[0][0]:(bc[2][0]+1), bc[0][1]:(bc[2][1]+1)]
+
+    if (np.array(bc) < 0).any(): #if the object is on the edge 
+        xi = np.arange(bc[0][1], bc[1][1], 1)
+        yi = np.arange(bc[0][0], bc[2][0], 1)
+        pad_x_i = np.where(xi < 0)
+        keep_x_i = np.where(xi>=0)[0]
+        pad_y_i = np.where(yi < 0)
+        keep_y_i = np.where(yi>=0)[0]
+
+        im = np.zeros((len(yi), len(xi)))
+        if len(pad_x_i) > 0:
+            im[pad_x_i] = 0
+        if len(pad_y_i) > 0:
+            im[pad_y_i] = 0
+        im[keep_y_i[0]:keep_y_i[-1]+1, keep_x_i[0]:keep_x_i[-1]+1] = segment[keep_y_i[0]:keep_y_i[-1]+1, keep_x_i[0]:keep_x_i[-1]+1]
+        # plt.imshow(im, cmap="gray")
+        # plt.show()
+        return im, True
+    else: 
+        return segment[bc[0][0]:(bc[2][0]+1), bc[0][1]:(bc[2][1]+1)], False
 
 def box_in_sky(segment, box, centre):
     bx, by, bc = get_box_coords(box)
-    b_image = get_box_image(segment, box)
+    b_image, __ = get_box_image(segment, box)
 
     fig, (axs1, axs2) = plt.subplots(1, 2)
     fig.suptitle("Box in the Sky")
@@ -164,7 +228,6 @@ def refine_box(box, a):
     """
     box needs to be the box image itself
     """
-    print(np.shape(box))
     x_means = np.mean(box, axis=0)
     y_means = np.mean(box, axis=1)
 
@@ -271,34 +334,83 @@ def main2(): #keeping for historic reasons
 
     #arbitrary beginning threshold: the median of the edges needs to fall within 10% of the median of the overall box image
 
-def finding_masks(segment, point):
+
+def finding_masks(segment, point, counter):
+    # x_distance = point[1] - 3
+    # y_distance = point[0] - 3
+    # if (x_distance < 0) or (y_distance < 0):
+    #     #basically if the initial box of the point falls on the edge
+    #     masked_image = segment
+    #     masked_image[point[0], point[1]] = 0
+    #     return masked_image, 0, 0
+
     box_0 = create_box(point, prev_box=None)
 
     box_1 = create_box(point, box_0)
-    b1_image = get_box_image(segment, box_1)
-    #a1, m1, s1 = box_stats(b1_image) #other threshold ideas
+    b1_image, padded = get_box_image(segment, box_1)
+    if padded:
+        plt.title("First padded box")
+        plt.imshow(b1_image)
+        plt.show()
+        
+    #a1, m1, s1 = box_stats(b1_image) #other threshold ideas 
     xmus, ymus, xmeds, ymeds = axis_stats(b1_image)
+
+    if (len(ymus) == 0) or (len(xmus) == 0) or (len(xmeds) == 0) or (len(ymeds) == 0):
+        print(xmus)
+        print(ymus)
+        print(xmeds)
+        print(ymeds)
+        print("\n")
+        print(point)
+        print(box_0)
+        print(box_1)
+        # plt.imshow(get_box_image(segment, box_0))
+        # plt.show()
+        # plt.imshow(b1_image)
+        # plt.show()
 
     prev_box = box_1
 
     # b0_image = get_box_image(segment, box_0)
     # xmus, ymus, xmeds, ymeds = axis_stats(b0_image)
 
-    box_n = []
-    bn_image = []
+    box_n = box_1
+    bn_image = b1_image
 
-    print(f"Means x {xmus[0]}, {xmus[-1]}; y {ymus[0]}, {ymus[-1]}")
-    print(f"Medians x {xmeds[0]}, {xmeds[-1]}; y {ymeds[0]}, {ymeds[-1]}")
+    # print(f"Means x {xmus[0]}, {xmus[-1]}; y {ymus[0]}, {ymus[-1]}")
+    # print(f"Medians x {xmeds[0]}, {xmeds[-1]}; y {ymeds[0]}, {ymeds[-1]}")
 
+    c = 1
 
     while (np.abs(xmus[0] - xmeds[0]) >= 0.1*xmeds[0]) or (np.abs(xmus[-1] - xmeds[-1]) >= 0.1*xmeds[0]) or (np.abs(ymus[0] - ymeds[0]) >= 0.1*ymeds[0]) or (np.abs(ymus[-1] - ymeds[-1]) >= 0.1*ymeds[0]):
         box_n = create_box(point, prev_box)
-        bn_image = get_box_image(segment, box_n)
+        bn_image, padded = get_box_image(segment, box_n)
+
         xmus, ymus, xmeds, ymeds = axis_stats(bn_image)
+
+        if (np.shape(bn_image)[0]+7 > np.shape(segment)[0]) or (np.shape(bn_image)[1]+7 > np.shape(segment)[1]):
+            #i.e. the box for the object is larger than the actual segment we are looking at 
+            #this is ignoring objects that could be at the edges for the moment
+            break
+
+        # if (len(ymus) == 0) or (len(xmus) == 0) or (len(xmeds) == 0) or (len(ymeds) == 0):
+        #     print(xmus)
+        #     print(ymus)
+        #     print(xmeds)
+        #     print(ymeds)
+        #     print("\n")
+        #     print(point)
+        #     print(prev_box)
+        #     print(box_n)
+        #     plt.imshow(bn_image)
+        #     plt.show()
+        
         prev_box=box_n
+        c+=1 
 
     # print(box_n)
-    box_in_sky(segment, box_n, point)
+    #box_in_sky(segment, box_n, point)
 
     a, m, s = box_stats(bn_image) #average, median, std
     refined_box, xi, yi = refine_box(bn_image, a)
@@ -321,11 +433,16 @@ def main():
     masks = []
     objects = []
 
+    counter = 1
+
+    print(f"segment shape {np.shape(segment)}")
+
     while (point != None).any():
-        segment, bm, obj = finding_masks(segment, point)
+        segment, bm, obj = finding_masks(segment, point, counter)
         masks.append(bm)
         objects.append(obj) 
         point = find_centre(segment)
+        counter += 1
 
     return masks, objects
 
