@@ -11,8 +11,8 @@ mask = iio.imread('Fits_Data/mask.png')
 
 # Plots the histogram.
 mosaic = ImageContainer(image=image[0].data)
-mosaic.threshold_mask().import_mask(mask=mask)
-mosaic.plot_pixel_hist(p0=[3e6, 4000, 1000], zoomed_in=True)
+mosaic.import_mask(mask=mask)
+mosaic.plot_pixel_hist(p0=[2e6, 3400, 10])
 
 
 # def plot_mask_image(image, mask):
