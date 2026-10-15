@@ -254,7 +254,7 @@ def plot_ellipse(im, ellipse):
     ax.set_aspect("equal")
     plt.show()
 
-def refine_box(box, a):
+def refine_box(box, a, edge):
     """
     box needs to be the box image itself
     """
@@ -271,27 +271,41 @@ def refine_box(box, a):
 
     rb = box[y_i[0]:y_i[-1]+1, x_i[0]:x_i[-1]+1]
 
-    if box[0][1] != box[0][2]:
+    if edge:
+        half_shape = np.shape(rb)
+        midpoint_x = len(x_i)
+        midpoint_y = len(y_i)
 
-        plt.imshow(box)
-        plt.title("box")
-        plt.show()
-
-        print("REFINED BOX")
-        print(x_i, y_i)
-        
-        plt.imshow(rb)
-        plt.title("REFINED BOX")
-        plt.show()
+        fill = np.average(rb)
 
         if (x_i == 0).any() or (x_i == bounds[1]).any(): #i.e. the object is on the edge top or bottom
-            im = np.zeros()
+            im = np.zeros((half_shape[0], half_shape[1]*2))
+            mask = np.zeros((half_shape[0], half_shape[1]*2))
+            if (x_i == 0).any() or (y_i == 0).any():
+                im[:, midpoint_x:] = rb
+                im[:, :midpoint_x] = fill
+                mask[:, midpoint_x:] = 1
+            else:
+                im[:midpoint_y, :] = rb
+                im[midpoint_y:, :] = fill
+                mask[:midpoint_y, :] = 1
+        elif (y_i == 0).any() or (y_i == bounds[0]).any(): #object on the top or bottom edge
+            im = np.zeros((half_shape[0]*2, half_shape[1]))
+            mask = np.zeros((half_shape[0]*2, half_shape[1]))
+            if (y_i == 0).any():
+                im[midpoint_y:, :] = rb
+                im[:midpoint_y, :] = fill
+                mask[midpoint_y:, :] = 1
+            else:
+                im[:, :midpoint_x] = rb
+                im[:, midpoint_x:] = fill
+                mask[:, :midpoint_x] = 1
+        else:
+            print("idk man")
 
-        #if (y_i == 0).any() or (y_i == bounds[0]).any():
-   
-
-    #return box[np.ix_(y_indices[0], x_indices[0])], x_indices, y_indices
-    return rb, x_i, y_i
+        return im, x_i, y_i, mask
+    
+    return rb, x_i, y_i, None
 
 def get_binary_mask(box, ellipse):
     """
@@ -315,7 +329,23 @@ def get_relative_mask(box, binary_mask):
     relative_mask = np.ma.array(box, mask=binary_mask)
     return 1- relative_mask/np.max(relative_mask) #normalised 
 
-def get_masks(box, ellipse):
+def get_masks(box, ellipse, edge):
+    print("hello?")
+    plt.imshow(box)
+    plt.title("box before")
+    plt.plot()
+
+    if (edge != None).any():
+        fill = np.average(box)
+        x_i = np.unique(np.where(edge != 0)[0])
+        y_i = np.unique(np.where(edge != 0)[1])
+
+        box = box[y_i[0]:y_i[-1]+1, x_i[0]:x_i[-1]+1]
+
+    plt.imshow(box)
+    plt.title("box after")
+    plt.plot()
+        
     bm = get_binary_mask(box, ellipse)
     rm = get_relative_mask(box, bm)
     return bm, rm
@@ -408,19 +438,13 @@ def finding_masks(segment, point, counter):
 
     b0_image = get_box_image(segment, box_0)
 
-    print(f"box_0 {box_0}")
-    print(np.shape(b0_image))
-    plt.imshow(b0_image)
-    plt.title("b0 image")
-    plt.show()
+    if box_0[1] != box_0[2]:
+        edge_condition = True
+    else:
+        edge_condition = False
 
     box_1 = create_box(point, box_0, boundaries)
-    print(f"box_1 {box_1}")
     b1_image = get_box_image(segment, box_1)
-
-    plt.imshow(b1_image)
-    plt.title("b1 image")
-    plt.show()
     
         
     #a1, m1, s1 = box_stats(b1_image) #other threshold ideas 
@@ -477,10 +501,10 @@ def finding_masks(segment, point, counter):
         c+=1 
 
     a, m, s = box_stats(bn_image) #average, median, std
-    refined_box, xi, yi = refine_box(bn_image, a)
+    refined_box, xi, yi, edge_mask = refine_box(bn_image, a, edge_condition)
     obj = fit_ellipse(refined_box, m)
     #plot_ellipse(refined_box, obj)
-    bm, rm = get_masks(refined_box, obj)
+    bm, rm = get_masks(refined_box, obj, edge_mask)
 
     plt.imshow(rm)
     plt.title("Relative Mask")
