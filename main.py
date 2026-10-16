@@ -17,6 +17,11 @@ mask = mask[::-1, ::]
 
 # data = hdu[0].data
 
+# Plots the histogram.
+mosaic = ImageContainer(image=image[0].data)
+mosaic.import_mask(mask=mask)
+mosaic.plot_image()
+# mosaic.plot_pixel_hist(p0=[2e6, 3400, 10])
 # # Plots the histogram.
 # mosaic = ImageContainer(image=image[0].data)
 # mosaic.import_mask(mask=mask)

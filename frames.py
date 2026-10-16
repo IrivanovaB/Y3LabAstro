@@ -276,3 +276,4 @@ class ImportMask(Mask):
         # White pixels have a total value across RGB of 765.
         self.data = np.where(self.data == 765, np.ones_like(self.data),
                              np.zeros_like(self.data))
+        self.data = np.flip(self.data, axis=0)
