@@ -2,11 +2,16 @@ import numpy as np
 from astropy.io import fits 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
+import imageio.v3 as iio
 import cv2
+from image_containers import ImageContainer
 
 #global variables
 hdu = fits.open(r"Fits_Data/mosaic.fits")
-image = hdu[0].data
+mask = iio.imread('Fits_Data/mask.png')
+mosaic = ImageContainer(image=hdu[0].data)
+mosaic.import_mask(mask=mask)
+image = np.ma.array(mosaic.image(), mask=[mosaic.mask()[0] == 0])
 
 
 def find_centre(box_0):
@@ -14,8 +19,8 @@ def find_centre(box_0):
 
     if box_0[max_index[0][0], max_index[0][1]] == 0.1*np.median(box_0): #basically have found all the bright objects
         return None
-    else: 
-        return max_index[0]
+    return max_index[0]
+
 
 def create_box(centre, prev_box, bounds):
     """
@@ -48,12 +53,11 @@ def create_box(centre, prev_box, bounds):
 
         h = np.abs(cs[0] - cs[1])
         w = np.abs(cs[3] - cs[2])
-
         return cs, h, w
 
-    if prev_box == None:
-        dx = [centre[1] - 3, centre[1] + 3]
-        dy = [centre[0] - 3, centre[0] + 3]
+    if prev_box is None:
+        dx = [centre[1] - 6, centre[1] + 6]
+        dy = [centre[0] - 6, centre[0] + 6]
         if (dx[0] < 0) or (dx[1] > bounds[1]) or (dy[0] < 0) or (dy[1] > bounds[0]):
             #(dx[0]<0) this means that to the bottom of the centre it goes beyond the image
             #(dx[1]>bounds[1]) this means that to the top of the centre it goes beyond the image
@@ -76,12 +80,19 @@ def create_box(centre, prev_box, bounds):
             dx = [c[1] - 7, c[1] + w + 7] #left, right #increase by w because corner in top left
             dy = [c[0] - 7, c[0] + h + 7] #down, up #decrase by h bc corner in top left
 
-            cs, h, w = edge_box(centre, bounds, dx, dy)
+        return [[centre[0]-6, centre[1]-6], 7, 7] #starting coords of the top left corner, h,w
+    # this works
+    h,w = prev_box[2], prev_box[1]
+    if h!= w: #i.e. working with a box on the edge
+        c = [prev_box[0][0], prev_box[0][1]] #the corner
 
-            return [[cs[1], cs[3]], h, w]
+        dx = [c[1] - 6, c[1] + w + 6] #left, right #increase by w because corner in top left
+        dy = [c[0] - h - 6, c[0] + 6] #down, up #decrase by h bc corner in top left
 
-        else:
-            return [[prev_box[0][0]-7, prev_box[0][1]-7], h+14, w+14]
+        cs, h, w = edge_box(centre, bounds, dx, dy)
+
+        return [[cs[1], cs[3]], h, w]
+    return [[prev_box[0][0]-6, prev_box[0][1]-6], h+12, w+12]
 
 
 def get_box_coords(box):
@@ -97,6 +108,7 @@ def get_box_coords(box):
 
     return box_x, box_y, box_coords
 
+
 def plot_box(centre, box):
     """
     need to include a way to plot the image
@@ -109,11 +121,12 @@ def plot_box(centre, box):
     plt.legend()
     plt.show()
 
+
 def get_box_image(segment, box):
     bx, by, bc = get_box_coords(box)
     h, w = box[1], box[2]
 
-    if (np.array(bc) < 0).any(): #if the object is on the edge 
+    if (np.array(bc) < 0).any(): #if the object is on the edge
         xi = np.arange(bc[0][1], bc[1][1], 1)
         yi = np.arange(bc[0][0], bc[2][0], 1)
         pad_x_i = np.where(xi < 0)
@@ -131,7 +144,8 @@ def get_box_image(segment, box):
         # plt.imshow(im, cmap="gray")
         # plt.show()
         return im
-    elif h != w: #true for the case of an object being on the edge
+
+    if h != w: #true for the case of an object being on the edge
         y = box[0][0]
         x = box[0][1]
         bounds = np.shape(segment)
@@ -141,8 +155,7 @@ def get_box_image(segment, box):
             #i.e. on the left or right edge of the segment
             if y == 0:
                 return im[0:y+1+h, x:x+w+1]
-            else:
-                return im[y-h:bounds[0], x:x+w+1]
+            return im[y-h:bounds[0], x:x+w+1]
 
         if x == 0 or (x + w >= bounds[1]):
             #i.e. on the top or bottom edge of the segment
@@ -171,6 +184,7 @@ def box_in_sky(segment, box, centre):
     axs2.imshow(b_image)
     plt.show()
 
+
 def box_stats(b_image, verbose=False):
     if verbose: 
         print(f"The mean is: {np.average(b_image)}")
@@ -178,6 +192,7 @@ def box_stats(b_image, verbose=False):
         print(f"The stdev is: {np.std(b_image)}")
         print("\n")
     return np.average(b_image), np.median(b_image), np.std(b_image)
+
 
 def axis_stats(im, plot=False):
     # im = np.where(im == 0, np.average(im), im) #possibly could use some sort of form of interpolation to fix the issue...
@@ -313,6 +328,7 @@ def refine_box(box, a, edge):
     
     return rb, x_i, y_i, None
 
+
 def get_binary_mask(box, ellipse):
     """
     where box is the refined box
@@ -324,16 +340,18 @@ def get_binary_mask(box, ellipse):
 
     object_binary_mask = cv2.ellipse(
         object_binary_mask, center, axes, ellipse[2], 0, 360, color=(255, 0, 0), thickness=-1)
-    
+
     binary_mask = object_binary_mask/np.max(object_binary_mask)
-    return 1 - binary_mask 
+    return 1 - binary_mask
+
 
 def get_relative_mask(box, binary_mask):
     """
-    where box is the refined box 
+    where box is the refined box
     """
     relative_mask = np.ma.array(box, mask=binary_mask)
-    return 1- relative_mask/np.max(relative_mask) #normalised 
+    return 1 - relative_mask/np.max(relative_mask) #normalised
+
 
 def get_masks(box, ellipse, edge):
     if (edge != None).any():
@@ -367,6 +385,7 @@ def plot_mask(im, mask):
     plt.title("Mask?")
     plt.show()
 
+
 def get_new_image(xi, yi, mask, box, segment):
     bx, by, bc = get_box_coords(box)
     
@@ -383,6 +402,7 @@ def get_new_image(xi, yi, mask, box, segment):
 
     return new_image
 
+
 def plot_new_image(xi, yi, mask, original_box, segment, plot=False):
     new_image = get_new_image(xi, yi, mask, original_box, segment)
 
@@ -395,8 +415,9 @@ def plot_new_image(xi, yi, mask, original_box, segment, plot=False):
 
     return new_image
 
+
 def main2(): #keeping for historic reasons
-    segment = image[2560:4601, 1549:2500] 
+    segment = image[2560:4601, 1549:2500]
 
     point = find_centre(segment)
     box_0 = create_box(point, prev_box=None)
@@ -495,7 +516,7 @@ def finding_masks(segment, point, counter):
         xmus, ymus, xmeds, ymeds = axis_stats(bn_image)
 
         # if (np.shape(bn_image)[0]+7 > np.shape(segment)[0]) or (np.shape(bn_image)[1]+7 > np.shape(segment)[1]):
-        #     #i.e. the box for the object is larger than the actual segment we are looking at 
+        #     #i.e. the box for the object is larger than the actual segment we are looking at
         #     #this is ignoring objects that could be at the edges for the moment
         #     break
 
@@ -515,7 +536,7 @@ def finding_masks(segment, point, counter):
             break
 
         prev_box=box_n
-        c+=1 
+        c+=1
 
     plt.imshow(box_n)
     plt.show()
@@ -532,9 +553,12 @@ def finding_masks(segment, point, counter):
     plt.title("relative mask")
     plt.show()
 
-    masked_image = plot_new_image(xi, yi, bm, box_n, segment) #depends if we want to use binary or relative mask 
+    #masked_image = plot_new_image(xi, yi, bm, box_n, segment) #depends if we want to use binary or relative mask
+    xi = np.arange(0, np.shape(bn_image)[1], 1)
+    yi = np.arange(0, np.shape(bn_image)[0], 1)
+    masked_image = plot_new_image(xi, yi, bm, box_n, segment)
     return masked_image, bm, obj
-    
+
 
 def main():
     segment = image[2560:4601, 1549:2500]
@@ -557,7 +581,7 @@ def main():
     while (point != None).any():
         segment, bm, obj = finding_masks(segment, point, counter)
         masks.append(bm)
-        objects.append(obj) 
+        objects.append(obj)
         point = find_centre(segment)
         plt.imshow(segment)
         plt.title("Edge object removed from segment")
@@ -566,15 +590,11 @@ def main():
 
     return masks, objects
 
+
 m, o = main()
 print(len(o))
-    
+
 # image =image[2560:4601, 1549:2500]
 # #plt.imshow(image[2560:4601, 1549:2500])
 # plt.imshow(image[0:15, 540:590])
 # plt.show()
-
-
-    
-
-
