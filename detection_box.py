@@ -388,7 +388,7 @@ def plot_mask(im, mask):
 
 def get_new_image(xi, yi, mask, box, segment):
     bx, by, bc = get_box_coords(box)
-    
+
     #refined box
     rb = [bc[0][1]+xi[0], bc[0][1]+xi[-1], bc[0][0]+yi[0], bc[0][0]+yi[-1]]
 
