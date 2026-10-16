@@ -3,10 +3,18 @@ from astropy.io import fits
 import matplotlib.pyplot as plt
 import imageio.v3 as iio
 from image_containers import ImageContainer
+from detection_box import main 
+import cv2
 
 #Read in our analysis image
 image = fits.open("Fits_Data/mosaic.fits")
-mask = iio.imread('Fits_Data/mask.png')
+image = image[0].data
+# mask = iio.imread('Fits_Data/mask.png')
+mask = cv2.imread('Fits_Data/mask.png')
+mask = cv2.cvtColor(mask, 7)
+
+mask = mask[::-1, ::]
+
 # data = hdu[0].data
 
 # Plots the histogram.
@@ -14,6 +22,14 @@ mosaic = ImageContainer(image=image[0].data)
 mosaic.import_mask(mask=mask)
 mosaic.plot_image()
 # mosaic.plot_pixel_hist(p0=[2e6, 3400, 10])
+# # Plots the histogram.
+# mosaic = ImageContainer(image=image[0].data)
+# mosaic.import_mask(mask=mask)
+# mosaic.plot_pixel_hist(p0=[2e6, 3400, 10])
+
+
+image = image*mask
+m, o = main(image)
 
 
 # def plot_mask_image(image, mask):
