@@ -13,8 +13,7 @@ class SourceDetector:
     def __init__(self, image):
         self.image = image
         self.data = self.image.data
-        self.__sources__ = []
-        self.__source_masks__ = []
+        self.__sources = []
         return self
 
     def sources(self):
@@ -22,7 +21,7 @@ class SourceDetector:
         Returns:
             list: A list of the coordinates of the sources.
         '''
-        return self.__sources__
+        return self.__sources
 
     def source_masks(self):
         return self.__source_masks__
@@ -48,7 +47,7 @@ class SourceDetector:
             return
         
         max_pix_coord = np.argmax(self.data)
-        self.__sources__.append(max_pix_coord)
+        self.__sources.append(max_pix_coord)
 
         object_mask_bol = Mask(np.zeros(self.data.shape()))
 
