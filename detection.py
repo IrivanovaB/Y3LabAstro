@@ -1,6 +1,6 @@
 import numpy as np
 from astropy.io import fits 
-from classes import Frame, Image, Mask
+from frames import Frame, Image, Mask
 from scipy import optimize, ndimage
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse

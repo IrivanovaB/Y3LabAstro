@@ -22,6 +22,20 @@ class ImageContainer():
         self.__image = Image(image)
         self.__mask = []
 
+    def image(self):
+        '''
+        Returns:
+            arr: The image data.
+        '''
+        return self.__image.data
+
+    def mask(self):
+        '''
+        Returns:
+            list: The mask data.
+        '''
+        return [mask.data for mask in self.__mask]
+
     def edge_mask(self):
         '''
         Adds an EdgeMask.
@@ -43,7 +57,7 @@ class ImageContainer():
     def import_mask(self, mask):
         '''
         Imports a mask stored as a PNG.
-    
+
         Args:
             mask (arr): The mask to be imported.
         '''
