@@ -556,7 +556,7 @@ def main(segment):
 
     while (point != None).any():
         segment, bm, obj = finding_masks(segment, point, counter)
-        masks.append(bm)
+        #masks.append(bm)
         objects.append(obj) 
         point = find_centre(segment)
         plt.imshow(segment)
@@ -566,7 +566,7 @@ def main(segment):
 
     return masks, objects
 
-# m, o = main()
+# o = main()
 # print(len(o))
     
 # image =image[2560:4601, 1549:2500]
