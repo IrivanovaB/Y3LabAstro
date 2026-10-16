@@ -30,11 +30,27 @@ def create_box(centre, prev_box, bounds):
     """
 
     def edge_box(centre, bounds, dx, dy):
-        #coords (y up, y down, x right, x left)
-        cs = np.max(
-            [[bounds[0], 0, bounds[1], 0], [dy[1], dy[0], dx[1], dx[0]]],
-            axis=0
-        )
+        cs = [0., 0., 0., 0.] #coords (y up, y down, x right, x left)
+        if (dy[1] > bounds[0] -1):
+            cs[0] = bounds[0]
+        else:
+            cs[0] = dy[1] 
+
+        if dy[0] < 0:
+            cs[1] = 0
+        else:
+            cs[1] = dy[0] 
+
+        if dx[1] > bounds[1]:
+            cs[2] = bounds[1]
+        else:
+            cs[2] = dx[1] 
+        
+        if dx[0] < 0:
+            cs[3] = 0
+        else:
+            cs[3] = dx[0] 
+
         h = np.abs(cs[0] - cs[1])
         w = np.abs(cs[3] - cs[2])
         return cs, h, w
@@ -49,7 +65,20 @@ def create_box(centre, prev_box, bounds):
 
             cs, h, w = edge_box(centre, bounds, dx, dy)
 
-            return [[cs[1], cs[3]], h, w]    #starting in the bottom left (i.e. top left i think)
+            return [[cs[1], cs[3]], h, w]    #starting in the bottom left (i.e. top left i think) 
+              
+        else:
+            return [[centre[0]-3, centre[1]-3], 7, 7] #starting coords of the top left corner, h,w 
+        """
+        this works
+        """
+    else:
+        h,w = prev_box[2], prev_box[1]
+        if h!= w: #i.e. working with a box on the edge 
+            c = [prev_box[0][0], prev_box[0][1]] #the corner
+
+            dx = [c[1] - 7, c[1] + w + 7] #left, right #increase by w because corner in top left
+            dy = [c[0] - 7, c[0] + h + 7] #down, up #decrase by h bc corner in top left
 
         return [[centre[0]-6, centre[1]-6], 7, 7] #starting coords of the top left corner, h,w
     # this works
@@ -122,20 +151,20 @@ def get_box_image(segment, box):
         bounds = np.shape(segment)
         im = segment
 
-        if y == 0 or y == bounds[0]:
+        if y == 0 or (y +h >= bounds[0]):
             #i.e. on the left or right edge of the segment
             if y == 0:
                 return im[0:y+1+h, x:x+w+1]
             return im[y-h:bounds[0], x:x+w+1]
 
-        if x == 0 or x == bounds[1]:
+        if x == 0 or (x + w >= bounds[1]):
             #i.e. on the top or bottom edge of the segment
             if x == 0:
-                return im[y-h//2:y+h//2+1, 0:x+w+1]
-            return im[y-h//2:y+h//2+1, x-w:bounds[1]]
-
-    return segment[bc[0][0]:(bc[2][0]+1), bc[0][1]:(bc[2][1]+1)]
-
+                return im[y:y+h+1, 0:x+w+1]
+            else:
+                return im[y:y+h+1, x-w:bounds[1]]
+    else:   
+        return segment[bc[0][0]:(bc[2][0]+1), bc[0][1]:(bc[2][1]+1)]
 
 def box_in_sky(segment, box, centre):
     bx, by, bc = get_box_coords(box)
@@ -166,6 +195,7 @@ def box_stats(b_image, verbose=False):
 
 
 def axis_stats(im, plot=False):
+    # im = np.where(im == 0, np.average(im), im) #possibly could use some sort of form of interpolation to fix the issue...
     x_means = np.mean(im, axis=0)
     y_means = np.mean(im, axis=1)
     x_medians = np.median(im, axis=0)
@@ -240,8 +270,7 @@ def plot_ellipse(im, ellipse):
     ax.set_aspect("equal")
     plt.show()
 
-
-def refine_box(box, a):
+def refine_box(box, a, edge):
     """
     box needs to be the box image itself
     """
@@ -258,27 +287,46 @@ def refine_box(box, a):
 
     rb = box[y_i[0]:y_i[-1]+1, x_i[0]:x_i[-1]+1]
 
-    # if box[0][1] != box[0][2]:
+    h, w = box[1], box[2]
 
-    #     plt.imshow(box)
-    #     plt.title("box")
-    #     plt.show()
+    if edge:
+        half_shape = np.shape(rb)
+        midpoint_x = len(x_i)
+        midpoint_y = len(y_i)
 
-    #     print("REFINED BOX")
-    #     print(x_i, y_i)
-        
-    #     plt.imshow(rb)
-    #     plt.title("REFINED BOX")
-    #     plt.show()
+        fill = np.average(rb)
 
-    #     if (x_i == 0).any() or (x_i == bounds[1]).any(): #i.e. the object is on the edge top or bottom
-    #         im = np.zeros()
+        if (x_i == 0).any() or (x_i >= bounds[1]-1).any(): #i.e. the object is on the edge top or bottom
+            im = np.zeros((half_shape[0], half_shape[1]*2))
+            mask = np.zeros((half_shape[0], half_shape[1]*2))
+            if (x_i == 0).any() or (y_i == 0).any():
+                im[:, midpoint_x:] = rb
+                im[:, :midpoint_x] = fill
+                mask[:, midpoint_x:] = 1
+            else:
+                im[:midpoint_y, :] = rb
+                im[midpoint_y:, :] = fill
+                mask[:midpoint_y, :] = 1
+        elif (y_i == 0).any() or (y_i >= bounds[0]-1).any(): #object on the top or bottom edge
+            im = np.zeros((half_shape[0]*2, half_shape[1]))
+            mask = np.zeros((half_shape[0]*2, half_shape[1]))
+            if (y_i == 0).any():
+                # im[midpoint_y:, :] = rb
+                # im[:midpoint_y, :] = fill
+                # mask[midpoint_y:, :] = 1
+                im[:, midpoint_x:] = rb
+                im[:, :midpoint_x] = fill
+                mask[:, midpoint_x:] = 1
+            else:
+                im[:midpoint_y, :] = rb
+                im[midpoint_y:, :] = fill
+                mask[midpoint_y:, :] = 1
+        else:
+            print("idk man")
 
-    #     if (y_i == 0).any() or (y_i == bounds[0]).any():
-
-
-    #return box[np.ix_(y_indices[0], x_indices[0])], x_indices, y_indices
-    return rb, x_i, y_i
+        return im, x_i, y_i, mask
+    
+    return rb, x_i, y_i, None
 
 
 def get_binary_mask(box, ellipse):
@@ -305,10 +353,30 @@ def get_relative_mask(box, binary_mask):
     return 1 - relative_mask/np.max(relative_mask) #normalised
 
 
-def get_masks(box, ellipse):
-    bm = get_binary_mask(box, ellipse)
-    rm = get_relative_mask(box, bm)
-    return bm, rm
+def get_masks(box, ellipse, edge):
+    if (edge != None).any():
+        x_i = np.unique(np.where(edge != 0)[0])
+        y_i = np.unique(np.where(edge != 0)[1])
+
+        plt.imshow(box)
+        plt.show()
+
+        print(x_i, y_i)
+        
+
+        bm = get_binary_mask(box, ellipse) 
+
+        plt.imshow(bm)
+        plt.show()
+
+        bm = bm[x_i[0]:x_i[-1]+1, y_i[0]:y_i[-1]+1]  #not sure why but this works
+        box = box[x_i[0]:x_i[-1]+1, y_i[0]:y_i[-1]+1]    
+        rm = get_relative_mask(box, bm)
+        return bm, rm
+    else:
+        bm = get_binary_mask(box, ellipse) 
+        rm = get_relative_mask(box, bm)
+        return bm, rm
 
 
 def plot_mask(im, mask):
@@ -401,37 +469,35 @@ def finding_masks(segment, point, counter):
 
     b0_image = get_box_image(segment, box_0)
 
-    # print(f"box_0 {box_0}")
-    # print(np.shape(b0_image))
-    # plt.imshow(b0_image)
-    # plt.title("b0 image")
-    # plt.show()
+
+    if box_0[1] != box_0[2]:
+        edge_condition = True
+    else:
+        edge_condition = False
 
     box_1 = create_box(point, box_0, boundaries)
-    # print(f"box_1 {box_1}")
     b1_image = get_box_image(segment, box_1)
-
+    
     # plt.imshow(b1_image)
-    # plt.title("b1 image")
     # plt.show()
 
-
-    #a1, m1, s1 = box_stats(b1_image) #other threshold ideas
+        
+    #a1, m1, s1 = box_stats(b1_image) #other threshold ideas 
     xmus, ymus, xmeds, ymeds = axis_stats(b1_image)
 
-    # if (len(ymus) == 0) or (len(xmus) == 0) or (len(xmeds) == 0) or (len(ymeds) == 0):
-    #     print(xmus)
-    #     print(ymus)
-    #     print(xmeds)
-    #     print(ymeds)
-    #     print("\n")
-    #     print(point)
-    #     print(box_0)
-    #     print(box_1)
-    #     plt.imshow(get_box_image(segment, box_0))
-    #     plt.show()
-    #     plt.imshow(b1_image)
-    #     plt.show()
+    if (len(ymus) == 0) or (len(xmus) == 0) or (len(xmeds) == 0) or (len(ymeds) == 0):
+        print(xmus)
+        print(ymus)
+        print(xmeds)
+        print(ymeds)
+        print("\n")
+        print(point)
+        print(box_0)
+        print(box_1)
+        # plt.imshow(get_box_image(segment, box_0))
+        # plt.show()
+        # plt.imshow(b1_image)
+        # plt.show()
 
     prev_box = box_1
 
@@ -443,7 +509,7 @@ def finding_masks(segment, point, counter):
 
     c = 1
 
-    while (np.abs(xmus[0] - xmeds[0]) >= 0.1*xmeds[0]) or (np.abs(xmus[-1] - xmeds[-1]) >= 0.1*xmeds[0]) or (np.abs(ymus[0] - ymeds[0]) >= 0.1*ymeds[0]) or (np.abs(ymus[-1] - ymeds[-1]) >= 0.1*ymeds[0]):
+    while (np.abs(xmus[0] - xmeds[0]) >= 0.12*xmeds[0]) or (np.abs(xmus[-1] - xmeds[-1]) >= 0.12*xmeds[0]) or (np.abs(ymus[0] - ymeds[0]) >= 0.12*ymeds[0]) or (np.abs(ymus[-1] - ymeds[-1]) >= 0.12*ymeds[0]):
         box_n = create_box(point, prev_box, boundaries)
         bn_image = get_box_image(segment, box_n)
 
@@ -465,21 +531,27 @@ def finding_masks(segment, point, counter):
         #     print(box_n)
         #     plt.imshow(bn_image)
         #     plt.show()
+        
+        if (box_n[1] == prev_box[1]) and (box_n[2] == prev_box[2]): #i.e. if box stops increasing
+            break
 
         prev_box=box_n
         c+=1
 
-    box_in_sky(segment, box_n, point)
-    a, m, s = box_stats(bn_image) #average, median, std
-    #refined_box, xi, yi = refine_box(bn_image, a)
-    refined_box = bn_image
-    obj = fit_ellipse(refined_box, m)
-    plot_ellipse(refined_box, obj)
-    bm, rm = get_masks(refined_box, obj)
+    plt.imshow(box_n)
+    plt.show()
 
-    # plt.imshow(rm)
-    # plt.title("Relative Mask")
-    # plt.show()
+    #box_in_sky(segment, box_n, point)
+    a, m, s = box_stats(bn_image) #average, median, std
+    refined_box, xi, yi, edge_mask = refine_box(bn_image, a, edge_condition)
+
+    obj = fit_ellipse(refined_box, m)
+    #plot_ellipse(refined_box, obj)
+    bm, rm = get_masks(refined_box, obj, edge_mask)
+
+    plt.imshow(rm)
+    plt.title("relative mask")
+    plt.show()
 
     #masked_image = plot_new_image(xi, yi, bm, box_n, segment) #depends if we want to use binary or relative mask
     xi = np.arange(0, np.shape(bn_image)[1], 1)
@@ -490,8 +562,11 @@ def finding_masks(segment, point, counter):
 
 def main():
     segment = image[2560:4601, 1549:2500]
-    # segment = segment[0:15, 540:590]  #example of an edge object for the segment
+    #segment = segment[0:15, 540:590]  #example of an edge object for the segment
 
+    #segment = np.transpose(segment)
+
+    segment = segment[::-1, ::-1]
     point = find_centre(segment)
 
     plt.imshow(segment)
