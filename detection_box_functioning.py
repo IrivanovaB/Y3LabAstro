@@ -1,3 +1,4 @@
+import json
 import numpy as np
 from astropy.io import fits 
 import matplotlib.pyplot as plt
@@ -51,7 +52,7 @@ def create_box(centre, prev_box, bounds):
 
             return [[cs[1], cs[3]], h, w]    #starting in the bottom left (i.e. top left i think)
 
-        return [[centre[0]-6, centre[1]-6], 7, 7] #starting coords of the top left corner, h,w
+        return [[centre[0]-6, centre[1]-6], 13, 13] #starting coords of the top left corner, h,w
     # this works
     h,w = prev_box[2], prev_box[1]
     if h!= w: #i.e. working with a box on the edge
@@ -469,13 +470,25 @@ def finding_masks(segment, point, counter):
         prev_box=box_n
         c+=1
 
-    box_in_sky(segment, box_n, point)
+    #box_in_sky(segment, box_n, point)
     a, m, s = box_stats(bn_image) #average, median, std
     #refined_box, xi, yi = refine_box(bn_image, a)
     refined_box = bn_image
     obj = fit_ellipse(refined_box, m)
-    plot_ellipse(refined_box, obj)
+
+    #plot_ellipse(refined_box, obj)
     bm, rm = get_masks(refined_box, obj)
+
+    bm_r = 1 - bm
+    ell = refined_box*bm_r
+
+    flux_sum = np.sum(ell)
+    no = np.sum(bm_r)
+
+    back = refined_box*bm
+    back_av = np.average(back)
+
+    flux = flux_sum - no*back_av
 
     # plt.imshow(rm)
     # plt.title("Relative Mask")
@@ -485,7 +498,7 @@ def finding_masks(segment, point, counter):
     xi = np.arange(0, np.shape(bn_image)[1], 1)
     yi = np.arange(0, np.shape(bn_image)[0], 1)
     masked_image = plot_new_image(xi, yi, bm, box_n, segment)
-    return masked_image, bm, obj
+    return masked_image, obj, flux 
 
 
 def main():
@@ -494,30 +507,39 @@ def main():
 
     point = find_centre(segment)
 
-    plt.imshow(segment)
-    plt.title("Original segment")
-    plt.show()
+    # plt.imshow(segment)
+    # plt.title("Original segment")
+    # plt.show()
 
-    masks = []
     objects = []
+    fluxes = []
+    with open("fluxes.json", "w") as flux_file:
+        json.dump(fluxes, flux_file)
 
     counter = 1
 
     while (point != None).any():
-        segment, bm, obj = finding_masks(segment, point, counter)
-        masks.append(bm)
+        segment, obj, flux = finding_masks(segment, point, counter)
+        #masks.append(bm)
         objects.append(obj)
+        fluxes.append(flux)
+        with open("fluxes.json", "w") as flux_file:
+            json.dump([float(value) for value in fluxes], flux_file)
         point = find_centre(segment)
-        plt.imshow(segment)
-        plt.title("Edge object removed from segment")
-        plt.show()
+        # plt.imshow(segment)
+        # plt.title("Edge object removed from segment")
+        # plt.show()
         counter += 1
 
-    return masks, objects
+    return objects, fluxes
 
 
-m, o = main()
+o, f = main()
 print(len(o))
+
+plt.hist(f)
+plt.savefig("figures/RESULTS")
+plt.show()
 
 # image =image[2560:4601, 1549:2500]
 # #plt.imshow(image[2560:4601, 1549:2500])
