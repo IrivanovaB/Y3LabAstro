@@ -469,8 +469,8 @@ def finding_masks(segment, point, counter):
 
     b0_image = get_box_image(segment, box_0)
 
-    plt.imshow(b0_image)
-    plt.show()
+    # plt.imshow(b0_image)
+    # plt.show()
 
 
     if box_0[1] != box_0[2]:
@@ -481,8 +481,8 @@ def finding_masks(segment, point, counter):
     box_1 = create_box(point, box_0, boundaries)
     b1_image = get_box_image(segment, box_1)
     
-    plt.imshow(b1_image)
-    plt.show()
+    # plt.imshow(b1_image)
+    # plt.show()
 
         
     #a1, m1, s1 = box_stats(b1_image) #other threshold ideas 
@@ -563,8 +563,8 @@ def finding_masks(segment, point, counter):
     return masked_image, bm, obj
 
 
-def main(segment):
-    # segment = image[2560:4601, 1549:2500]
+def main():
+    segment = image[2560:4601, 1549:2500]
     #segment = segment[0:15, 540:590]  #example of an edge object for the segment
 
     #segment = np.transpose(segment)
@@ -593,7 +593,7 @@ def main(segment):
 
     return masks, objects
 
-# o = main()
+m, o = main()
 # print(len(o))
     
 
