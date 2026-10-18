@@ -51,7 +51,7 @@ def create_box(centre, prev_box, bounds):
 
             return [[cs[1], cs[3]], h, w]    #starting in the bottom left (i.e. top left i think)
 
-        return [[centre[0]-6, centre[1]-6], 7, 7] #starting coords of the top left corner, h,w
+        return [[centre[0]-6, centre[1]-6], 13, 13] #starting coords of the top left corner, h,w
     # this works
     h,w = prev_box[2], prev_box[1]
     if h!= w: #i.e. working with a box on the edge
