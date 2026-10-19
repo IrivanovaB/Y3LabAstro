@@ -277,3 +277,20 @@ class ImportMask(Mask):
         self.data = np.where(self.data == 765, np.ones_like(self.data),
                              np.zeros_like(self.data))
         self.data = np.flip(self.data, axis=0)
+
+
+def load_mask(mask):
+    '''
+    Converts a mask stored as a PNG into a binary mask.
+
+    Args:
+        mask (arr): The mask in RGB.
+
+    Returns:
+        arr: The binary mask with 1 for the masked regions.
+    '''
+    mask = np.sum(mask[:,:,:3], axis=2)
+    # White pixels have a total value across RGB of 765.
+    mask = np.where(mask == 765, np.zeros_like(mask), np.ones_like(mask))
+    mask = np.flip(mask, axis=0)
+    return mask
