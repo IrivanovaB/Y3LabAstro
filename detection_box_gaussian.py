@@ -17,9 +17,11 @@ box_size = 6
 bg_box_size = 50
 
 
-# Goals for today:
-# Implement Gaussian fitting for the sources.
-# Implement a box size threshold for the edge cases such that it doesn't get below 13 pixels.
+# Future considerations:
+# Uncertainty quantification.
+# Identification of overlapping sources.
+# Statistical testing of methods (e.g. Gaussian fit residual).
+# Threshold justification.
 
 # Note that all of the following are in (y, x) instead of (x, y).
 
@@ -525,23 +527,34 @@ def finding_masks(im, centre):
         box_im_edge = np.concatenate(
             (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
         )
+        box_in_sky(im=im, box=box, centre=centre)
 
     box_in_sky(im=im, box=box, centre=centre)
 
     if box[1] != box[2]:
         box_im, xi, yi, _ = pad_edge_box(box_im=box_im, bounds=bounds)
 
-    obj = fit_gaussian(box_im=box_im)
-    plot_gaussian(box_im=box_im, popt=obj[0])
+    while True:
+        try:
+            obj = fit_gaussian(box_im=box_im)
+            plot_gaussian(box_im=box_im, popt=obj[0])
 
-    ellipse = get_ellipse_params(popt=obj[0])
-    plot_ellipse(box_im=box_im, ellipse=ellipse)
+            ellipse = get_ellipse_params(popt=obj[0])
+            plot_ellipse(box_im=box_im, ellipse=ellipse)
 
-    bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
-    flux = np.sum(box_im * bm)
-    bm_r = 1 - bm
-    bg_flux = np.mean(box_im * bm_r)
-    flux = flux - bg_flux * bm.sum()
+            bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
+            flux = np.sum(box_im * bm)
+            bm_r = 1 - bm
+            bg_flux = np.mean(box_im * bm_r)
+            flux = flux - bg_flux * bm.sum()
+            break
+
+        except RuntimeError:
+            bm = np.where(box_im > np.median(box_im),
+                          np.ones_like(box_im), np.zeros_like(box_im))
+            obj = np.nan
+            flux = np.nan
+            break
 
     xi = np.arange(0, np.shape(box_im)[1], 1)
     yi = np.arange(0, np.shape(box_im)[0], 1)
