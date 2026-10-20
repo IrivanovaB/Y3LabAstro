@@ -92,6 +92,10 @@ def edge_box(bounds, dx, dy):
     else:
         cs[1] = dx[0]
 
+    if cs[0] > cs[2]: #y2 < y1
+        cs[0], cs[2] = cs[2], cs[0]
+        cs[1], cs[3] = cs[3], cs[1]
+
     h = np.abs(cs[0] - cs[2])
     w = np.abs(cs[1] - cs[3])
     return cs, h, w
@@ -139,7 +143,7 @@ def create_box(centre, prev_box, bounds):
         # Left, right. Increase by w because corner in top left.
         dx = [c[1] - box_size, c[1] + w + box_size]
         # Down, up. Decrase by h because corner in top left.
-        dy = [c[0] - h - box_size, c[0] + box_size]
+        dy = [c[0] - box_size, c[0] + h + box_size]
 
         cs, h, w = edge_box(bounds=bounds, dx=dx, dy=dy)
         return [[cs[0], cs[1]], h, w]
@@ -334,23 +338,19 @@ def plot_gaussian(box_im, popt):
 def fit_n_gaussian(box_im, peaks):
     nx, ny = np.shape(box_im)
     xy = np.meshgrid(range(nx), range(ny))
-
-    print(peaks)
-    print(np.shape(box_im))
     
     ps = []
     for peak in peaks:
         #A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C
-        ps.append([box_im[peak[1], peak[0]], peak[1], peak[0], nx/16, ny/16, np.pi/6, 0, 0, np.median(box_im)])
+        ps.append([box_im[peak[1], peak[0]], peak[0], peak[1], nx/16, ny/16, np.pi/6, 0, 0, np.median(box_im)])
 
     return gaussian_2d_n_fit(xy_data=xy, z_data=box_im, p0=ps)
 
 def plot_n_gaussian(box_im, popt):
-    nx, ny = np.shape(box_im)
+    ny, nx = np.shape(box_im)
     x, y = np.meshgrid(range(nx), range(ny))
 
-    print(x, y)
-    print(np.shape(box_im))
+    print(f"p {popt}")
 
     fig = plt.figure()
     subfig = fig.add_subplot(111, projection="3d")
@@ -359,7 +359,7 @@ def plot_n_gaussian(box_im, popt):
     subfig.legend()
 
 def get_residuals(box_im, popt):
-    nx, ny = np.shape(box_im)
+    ny, nx = np.shape(box_im)
     x, y = np.meshgrid(range(nx), range(ny))
 
     fit = gaussian_2d_n((x, y), *popt)
@@ -394,7 +394,7 @@ def get_ellipse_params(popt):
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
             rotation angle.
     '''
-    return (popt[1], popt[2]), (10*popt[3], 10*popt[4]), 180/np.pi*popt[5]
+    return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 180-180/np.pi*popt[5]
 
 
 def plot_ellipse(box_im, ellipse):
@@ -422,7 +422,7 @@ def plot_ellipse(box_im, ellipse):
     plt.show()
 
 
-def pad_edge_box(box_im, bounds):
+def pad_edge_box(box_im, bounds, source):
     '''
     Pads the edge box.
 
@@ -438,35 +438,40 @@ def pad_edge_box(box_im, bounds):
     midpoint_x = half_shape[1]
     midpoint_y = half_shape[0]
 
-    x_i = np.arange(0, midpoint_x, 1)
-    y_i = np.arange(0, midpoint_y, 1)
+    print(source, midpoint_x, midpoint_y)
+
+    # x_i = np.arange(0, midpoint_x, 1)
+    # y_i = np.arange(0, midpoint_y, 1)
 
     fill = np.average(box_im)
 
-    if (x_i == 0).any() or (x_i >= bounds[1]-1).any():
+    #if (x_i == 0).any() or (x_i >= bounds[1]-1).any():
+    if midpoint_x > midpoint_y:
         # i.e. The object is on the edge top or bottom.
         # So expanding this vertically. 
+        # i.e. the width is greater than the height and so had trouble expanding the height 
         padded_im = np.zeros((half_shape[0]*2, half_shape[1]))
         mask = np.zeros((half_shape[0]*2, half_shape[1]))
         print("1")
-        if (x_i == 0).any():
+        if source[1] < midpoint_y:
             #on the top
             padded_im[midpoint_y:, :] = box_im
             padded_im[:midpoint_y, :] = fill
-            mask[midpoint_y:, :] = 1
+            mask[midpoint_y:, :] = 0
             print("1")
         else:
             #on the bottom
             padded_im[:midpoint_y, :] = box_im
             padded_im[midpoint_y:, :] = fill
-            mask[:midpoint_y, :] = 1
+            mask[:midpoint_y, :] = 0
             print("2")
-    elif (y_i == 0).any() or (y_i >= bounds[0]-1).any():
+    #elif (y_i == 0).any() or (y_i >= bounds[0]-1).any():
+    elif midpoint_y > midpoint_x:
         # Object on the top or bottom edge.
         padded_im = np.zeros((half_shape[0]*2, half_shape[1]))
         mask = np.zeros((half_shape[0]*2, half_shape[1]))
         print("2")
-        if (y_i == 0).any():
+        if source[0] < midpoint_x:
             # box_im[midpoint_y:, :] = rb
             # box_im[:midpoint_y, :] = fill
             # mask[midpoint_y:, :] = 1
@@ -482,7 +487,8 @@ def pad_edge_box(box_im, bounds):
     else:
         print("idk man")
 
-    return padded_im, x_i, y_i, mask
+
+    return padded_im, mask
 
 
 def get_binary_mask(box_im, ellipse):
@@ -540,6 +546,43 @@ def get_new_image(xi, yi, mask, box, im, plot=False):
 
     return new_image
 
+def fit_ellipse(im, threshold): #this function was vibe coded with copilot to be improved/ammended later - just currently need to get something to work 
+    """Fit an ellipse to the largest connected region at or above threshold.
+
+    Returns ``((center_x, center_y), (diameter_1, diameter_2), angle_degrees)``,
+    with coordinates relative to ``im``.
+    """
+    im = np.asarray(im)
+
+    mask = np.ascontiguousarray(
+        (np.isfinite(im) & (im >= threshold)).astype(np.uint8)
+    )
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if not contours:
+        raise ValueError("No pixels meet the threshold")
+
+    contour = max(contours, key=cv2.contourArea)
+    if len(contour) < 5:
+        raise ValueError("The largest thresholded region needs at least 5 boundary points")
+
+    return cv2.fitEllipse(contour)
+
+def plot_ellipse_edge(im, ellipse):
+    center, diameters, angle = ellipse
+    fig, ax = plt.subplots()
+    ax.imshow(im, cmap="gray")
+    ax.add_patch(
+        Ellipse(
+            xy=center,
+            width=diameters[0],
+            height=diameters[1],
+            angle=angle,
+            fill=False,
+            edgecolor="red",
+        )
+    )
+    ax.set_aspect("equal")
+    plt.show()
 
 def get_pixel_threshold(im, centre):
     '''
@@ -600,46 +643,62 @@ def finding_masks(im, centre):
 
     while True:
         try:
-            # if box[1] != box[2]:
-            #     box_im = box_im*edge_mask
-
-            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*np.median(box_im))
-
-            if len(peaks) == 0:
-                peaks = [[centre[1], centre[0]]]
-
-            objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks)
-            plot_n_gaussian(box_im=box_im, popt=objs)
-            plt.show()
-
-            # obj = fit_gaussian(box_im=box_im)
-            # plot_gaussian(box_im=box_im, popt=obj[0])
-
-
-            residuals, chi_sq = get_residuals(box_im=box_im, popt=objs)
-            #plot_residuals(residuals, chi_sq)
-            #plt.show()
-
-            #need to discuss methods 
-            no_of_objs = len(objs)//9
-
-            objs = objs.reshape(no_of_objs, 9)
-
-            print(objs)
-
             bms = []
             flux_segment = []
-            for obj in objs:
-                ellipse = get_ellipse_params(popt=obj)
-                plot_ellipse(box_im=box_im, ellipse=ellipse)
 
-                bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
+            if box[1] != box[2]:
+                prepadded_box = box_im
+                box_im, edge_mask = pad_edge_box(box_im=box_im, bounds=bounds, source=centre)
+                plt.imshow(box_im)
+                plt.title("Returned image")
+                plt.show()    
+                box_im = np.ma.array(box_im, mask=(edge_mask))
+                
+                objs = fit_ellipse(box_im, np.median(box_im))
+                plot_ellipse_edge(box_im, objs)
+
+                bm = get_binary_mask(box_im=box_im, ellipse=objs)
+
                 bms.append(bm)
                 flux = np.sum(box_im * bm)
                 bm_r = 1 - bm
                 bg_flux = np.mean(box_im * bm_r)
                 flux = flux - bg_flux * bm.sum()
                 flux_segment.append(flux)
+            else:
+                peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*np.median(box_im))
+
+                if len(peaks) == 0:
+                    peaks = [[centre[1], centre[0]]]
+
+                objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks)
+                plot_n_gaussian(box_im=box_im, popt=objs)
+                plt.show()
+
+                # obj = fit_gaussian(box_im=box_im)
+                # plot_gaussian(box_im=box_im, popt=obj[0])
+
+
+                #residuals, chi_sq = get_residuals(box_im=box_im, popt=objs)
+                #plot_residuals(residuals, chi_sq)
+                #plt.show()
+
+                #need to discuss methods 
+                no_of_objs = len(objs)//9
+
+                objs = objs.reshape(no_of_objs, 9)
+
+                for obj in objs:
+                    ellipse = get_ellipse_params(popt=obj)
+                    plot_ellipse(box_im=box_im, ellipse=ellipse)
+
+                    bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
+                    bms.append(bm)
+                    flux = np.sum(box_im * bm)
+                    bm_r = 1 - bm
+                    bg_flux = np.mean(box_im * bm_r)
+                    flux = flux - bg_flux * bm.sum()
+                    flux_segment.append(flux)
 
             # ellipse = get_ellipse_params(popt=objs)
             # plot_ellipse(box_im=box_im, ellipse=ellipse)
@@ -664,6 +723,9 @@ def finding_masks(im, centre):
         #masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
         masked_image = get_new_image(xi=xi, yi=yi, mask=bm_mask, box=box, im=im)
 
+    plt.imshow(masked_image)
+    plt.show()
+
     return masked_image, objs, flux_segment
 
 
@@ -677,8 +739,8 @@ def main():
     # im = image
     im = im[0:15, 540:590]  #example of an edge object for the segment
 
-    # #segment = np.transpose(segment)
-    # #segment = segment[::-1, ::-1]
+    #im = np.transpose(im)
+    im = im[::-1, ::-1]
 
     centre = find_centre(im=im)
 
