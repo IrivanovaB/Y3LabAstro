@@ -50,7 +50,7 @@ def get_pixel_histogram(im):
     Returns:
         tuple[arr, arr]: The optimal values and the covariance matrix.
     '''
-    bins = np.arange(im.max()+10., step=bin_width)
+    bins = np.arange(np.max(im.compressed())+10., step=bin_width)
     return np.histogram(im, bins=bins)
 
 
@@ -76,20 +76,26 @@ def plot_pixel_histogram(im, p0=None):
         im (arr): The image.
         p0 (list | None): Initial guesses. If supplied, plots the
             Gaussian fit. Defaults to None.
+
+    Returns:
+        tuple[arr, arr]: If p0 is not None, the optimal values and the
+            covariance matrix.
     '''
     count, bin_edge = get_pixel_histogram(im=im)
     plt.stairs(count, bin_edge, fill=True)
+    plt.xlabel("Pixel Value (a.u.)")
+    plt.ylabel("Count")
+    plt.tight_layout()
     if p0 is not None:
         popt, pcov = fit_pixel_histogram(im=im, p0=p0)
         bins = (bin_edge[1:] + bin_edge[:-1]) / 2
         plt.plot(bins, gaussian_1d(bins, *popt))
         plt.xlim(popt[1] - 10*popt[2], popt[1] + 10*popt[2])
+        plt.show()
         perr = np.sqrt(np.diag(pcov))
         print(f'A = {popt[0]:.2f} +/- {perr[0]:.2f}\n'
               f'μ = {popt[1]:.2f} +/- {perr[1]:.2f}\n'
               f'σ = {popt[2]:.2f} +/- {perr[2]:.2f}')
-    plt.xlabel("Pixel Value (a.u.)")
-    plt.ylabel("Count")
-    plt.tight_layout()
+        return popt, pcov
     # plt.savefig("figures/masked image histogram", dpi=300)
     plt.show()

@@ -9,7 +9,7 @@ from images import load_image, plot_pixel_histogram
 image = load_image()
 
 # Plots the histogram.
-plot_pixel_histogram(im=image, p0=[2e6, 3400, 10])
+plot_pixel_histogram(im=image, p0=[2e6, 3400, 10, 0, 0])
 
 
 # def plot_mask_image(image, mask):

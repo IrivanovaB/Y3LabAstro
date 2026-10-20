@@ -1,25 +1,23 @@
+'''
+A module for photometry.
+'''
+
+import json
 import numpy as np
-from astropy.io import fits
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
-import imageio.v3 as iio
 import cv2
-import json
-from frames import load_mask
-from maths import gaussian_2d, gaussian_2d_fit, gaussian_2d_n, gaussian_2d_n_fit
+from skimage.feature import peak_local_max
+from images import load_image
+from maths import (gaussian_2d, gaussian_2d_fit,
+                   gaussian_2d_n, gaussian_2d_n_fit)
 
-# from scipy import ndimage
-from skimage.feature import peak_local_max 
 
 # Global variables.
-mosaic = fits.open('Fits_Data/mosaic.fits')
-mosaic_mask = iio.imread('Fits_Data/mask.png')
-
-# blurred_data = ndimage(mosaic[0].data, 3)
-
-image = np.ma.array(mosaic[0].data, mask=load_mask(mosaic_mask))
+image = load_image()
 box_size = 6
 bg_box_size = 50
+bg_threshold = 34
 
 
 # Future considerations:
@@ -35,8 +33,8 @@ def find_centre(im):
     '''
     Finds the coordinates of the brightest pixel in an image.
 
-    NOTE: The detection threshold currently is set at the median pixel
-    value of the image + 20.
+    NOTE: The detection threshold currently is set at 3*std of the
+    local background mean.
 
     Args:
         im (arr): The image.
@@ -45,7 +43,7 @@ def find_centre(im):
         tuple: The coordinates of the brightest pixel.
     '''
     max_index = np.unravel_index(np.argmax(im), np.shape(im))
-    if im[max_index] < (np.median(im) + 20):
+    if im[max_index] < (np.median(im) + bg_threshold):
         print("All sources found!")
         return None
     return max_index
@@ -331,18 +329,29 @@ def plot_gaussian(box_im, popt):
     subfig.legend()
     #plt.show()
 
+
 def fit_n_gaussian(box_im, peaks):
+    '''
+    Fits n Gaussian distributions with a background plane to the boxed
+    region.
+    '''
     nx, ny = np.shape(box_im)
     xy = np.meshgrid(range(nx), range(ny))
-    
+
     ps = []
     for peak in peaks:
         #A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C
-        ps.append([box_im[peak[1], peak[0]], peak[1], peak[0], nx/16, ny/16, np.pi/6, 0, 0, np.median(box_im)])
+        ps.append([box_im[peak[1], peak[0]], peak[1], peak[0], nx/16, ny/16,
+                   np.pi/6, 0, 0, np.median(box_im)])
 
     return gaussian_2d_n_fit(xy_data=xy, z_data=box_im, p0=ps)
 
+
 def plot_n_gaussian(box_im, popt):
+    '''
+    Plots the boxed region in 3D with the fitted n Gaussian
+    distributions.
+    '''
     nx, ny = np.shape(box_im)
     x, y = np.meshgrid(range(nx), range(ny))
 
@@ -352,7 +361,11 @@ def plot_n_gaussian(box_im, popt):
     subfig.plot_surface(x, y, gaussian_2d_n((x, y), *popt), alpha=0.5, label="Fit")
     subfig.legend()
 
+
 def get_residuals(box_im, popt):
+    '''
+    Computes the residual of the fit.
+    '''
     nx, ny = np.shape(box_im)
     x, y = np.meshgrid(range(nx), range(ny))
 
@@ -364,7 +377,11 @@ def get_residuals(box_im, popt):
     chi_squares = chi_squares/fit
     return residuals, (np.sum(chi_squares))/(len(chi_squares) - 9)
 
+
 def plot_residuals(res, chi_sq):
+    '''
+    Plots the residual of the fit.
+    '''
     nx, ny = np.shape(res)
     x, y = np.meshgrid(range(nx), range(ny))
 
@@ -374,6 +391,7 @@ def plot_residuals(res, chi_sq):
     subfig.legend()
     # plt.title(chi_sq)
     # plt.imshow(res)
+
 
 def get_ellipse_params(popt):
     '''
@@ -388,7 +406,7 @@ def get_ellipse_params(popt):
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
             rotation angle.
     '''
-    return (popt[1], popt[2]), (10*popt[3], 10*popt[4]), 180/np.pi*popt[5]
+    return (popt[1], popt[2]), (10*popt[3], 10*popt[4]), 180-180/np.pi*popt[5]
 
 
 def plot_ellipse(box_im, ellipse):
@@ -533,7 +551,8 @@ def get_pixel_threshold(im, centre):
     '''
     Computes the threshold on the pixel value at the edge of the box.
 
-    NOTE: The threshold is currently set at the median + 20.
+    NOTE: The threshold is currently set at 3*std of the local
+    background mean.
 
     Args:
         im (arr): The image.
@@ -545,7 +564,7 @@ def get_pixel_threshold(im, centre):
     box = [[centre[0] - bg_box_size, centre[1] - bg_box_size],
            2*bg_box_size + 1, 2*bg_box_size + 1]
     box_im = get_box_image(im=im, box=box)
-    return np.median(box_im) + 20
+    return np.median(box_im) + bg_threshold
 
 
 def finding_masks(im, centre):
@@ -650,7 +669,7 @@ def main():
     '''
     im = image[2560:4601, 1549:2500]
 
-    im = im[950:1010, 620:680]
+    # im = im[950:1010, 620:680]
     # im = image
     # segment = segment[0:15, 540:590]  #example of an edge object for the segment
 
@@ -673,11 +692,8 @@ def main():
         objects.append(obj)
         fluxes.append(flux)
         with open("fluxes.json", "w") as flux_file:
-            json.dump([float(value) for value in fluxes], flux_file)
+            json.dump([value for value in fluxes], flux_file)
         centre = find_centre(im=im)
         # plt.imshow(segment)
         # plt.title("Edge object removed from segment")
         # plt.show()
-
-
-main()
