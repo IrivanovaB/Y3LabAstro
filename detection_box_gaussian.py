@@ -159,8 +159,8 @@ def get_box_coords(box):
         tuple[arr, arr, arr]: The x-coordinates, the y-coordinates, and
             the combined coordinates.
     '''
-    h = box[2]
-    w = box[1]
+    h = box[1]
+    w = box[2]
 
     box_x = [box[0][1], box[0][1]+w-1, box[0][1]+w-1, box[0][1], box[0][1]]
     box_y = [box[0][0], box[0][0], box[0][0]+h-1, box[0][0]+h-1, box[0][0]]
@@ -334,6 +334,9 @@ def plot_gaussian(box_im, popt):
 def fit_n_gaussian(box_im, peaks):
     nx, ny = np.shape(box_im)
     xy = np.meshgrid(range(nx), range(ny))
+
+    print(peaks)
+    print(np.shape(box_im))
     
     ps = []
     for peak in peaks:
@@ -345,6 +348,9 @@ def fit_n_gaussian(box_im, peaks):
 def plot_n_gaussian(box_im, popt):
     nx, ny = np.shape(box_im)
     x, y = np.meshgrid(range(nx), range(ny))
+
+    print(x, y)
+    print(np.shape(box_im))
 
     fig = plt.figure()
     subfig = fig.add_subplot(111, projection="3d")
@@ -388,7 +394,7 @@ def get_ellipse_params(popt):
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
             rotation angle.
     '''
-    return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 180/np.pi*popt[5]
+    return (popt[1], popt[2]), (10*popt[3], 10*popt[4]), 180/np.pi*popt[5]
 
 
 def plot_ellipse(box_im, ellipse):
@@ -439,23 +445,27 @@ def pad_edge_box(box_im, bounds):
 
     if (x_i == 0).any() or (x_i >= bounds[1]-1).any():
         # i.e. The object is on the edge top or bottom.
-        padded_im = np.zeros((half_shape[0], half_shape[1]*2))
-        # print(np.shape(padded_im))
-        # print(np.shape(box_im))
-        # print(midpoint_x)
-        mask = np.zeros((half_shape[0], half_shape[1]*2))
-        if (x_i == 0).any() or (y_i == 0).any():
-            padded_im[:, midpoint_x:] = box_im
-            padded_im[:, :midpoint_x] = fill
-            mask[:, midpoint_x:] = 1
+        # So expanding this vertically. 
+        padded_im = np.zeros((half_shape[0]*2, half_shape[1]))
+        mask = np.zeros((half_shape[0]*2, half_shape[1]))
+        print("1")
+        if (x_i == 0).any():
+            #on the top
+            padded_im[midpoint_y:, :] = box_im
+            padded_im[:midpoint_y, :] = fill
+            mask[midpoint_y:, :] = 1
+            print("1")
         else:
+            #on the bottom
             padded_im[:midpoint_y, :] = box_im
             padded_im[midpoint_y:, :] = fill
             mask[:midpoint_y, :] = 1
+            print("2")
     elif (y_i == 0).any() or (y_i >= bounds[0]-1).any():
         # Object on the top or bottom edge.
         padded_im = np.zeros((half_shape[0]*2, half_shape[1]))
         mask = np.zeros((half_shape[0]*2, half_shape[1]))
+        print("2")
         if (y_i == 0).any():
             # box_im[midpoint_y:, :] = rb
             # box_im[:midpoint_y, :] = fill
@@ -463,10 +473,12 @@ def pad_edge_box(box_im, bounds):
             padded_im[:, midpoint_x:] = box_im
             padded_im[:, :midpoint_x] = fill
             mask[:, midpoint_x:] = 1
+            print("1")
         else:
             padded_im[:midpoint_y, :] = box_im
             padded_im[midpoint_y:, :] = fill
             mask[midpoint_y:, :] = 1
+            print("2")
     else:
         print("idk man")
 
@@ -580,17 +592,25 @@ def finding_masks(im, centre):
 
     box_in_sky(im=im, box=box, centre=centre)
 
-    if box[1] != box[2]:
-        box_im, xi, yi, _ = pad_edge_box(box_im=box_im, bounds=bounds)
+    # if box[1] != box[2]:
+    #     box_im, xi, yi, edge_mask = pad_edge_box(box_im=box_im, bounds=bounds)
+    #     plt.imshow(box_im)
+    #     plt.title("padded box")
+    #     plt.show()
 
     while True:
         try:
+            # if box[1] != box[2]:
+            #     box_im = box_im*edge_mask
+
             peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*np.median(box_im))
+
+            if len(peaks) == 0:
+                peaks = [[centre[1], centre[0]]]
 
             objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks)
             plot_n_gaussian(box_im=box_im, popt=objs)
             plt.show()
-
 
             # obj = fit_gaussian(box_im=box_im)
             # plot_gaussian(box_im=box_im, popt=obj[0])
@@ -598,12 +618,14 @@ def finding_masks(im, centre):
 
             residuals, chi_sq = get_residuals(box_im=box_im, popt=objs)
             #plot_residuals(residuals, chi_sq)
-            plt.show()
+            #plt.show()
 
             #need to discuss methods 
             no_of_objs = len(objs)//9
 
             objs = objs.reshape(no_of_objs, 9)
+
+            print(objs)
 
             bms = []
             flux_segment = []
@@ -626,7 +648,7 @@ def finding_masks(im, centre):
             # flux = np.sum(box_im * bm)
             # bm_r = 1 - bm
             # bg_flux = np.mean(box_im * bm_r)
-            # flux = flux - bg_flux * bm.sum()
+            # flux = flux - bg_flux * bm.sum()     
             break
 
         except RuntimeError:
@@ -651,9 +673,9 @@ def main():
     '''
     im = image[2560:4601, 1549:2500]
 
-    im = im[950:1010, 620:680]
+    #im = im[950:1010, 620:680]
     # im = image
-    # segment = segment[0:15, 540:590]  #example of an edge object for the segment
+    im = im[0:15, 540:590]  #example of an edge object for the segment
 
     # #segment = np.transpose(segment)
     # #segment = segment[::-1, ::-1]
@@ -666,15 +688,22 @@ def main():
 
     objects = []
     fluxes = []
-    with open("fluxes.json", "w") as flux_file:
-        json.dump(fluxes, flux_file)
+    # with open("fluxes.json", "w") as flux_file:
+    #     json.dump(fluxes, flux_file)
 
     while centre is not None:
-        im, obj, flux = finding_masks(im=im, centre=centre)
-        objects.append(obj)
-        fluxes.append(flux)
+        print(centre)
+        im, objs, f = finding_masks(im=im, centre=centre)
+
+
+        for obj in objs:
+            objects.append(obj)
+        for flux in f:
+            fluxes.append(flux)
+
         with open("fluxes.json", "w") as flux_file:
             json.dump([float(value) for value in fluxes], flux_file)
+            flux_file.close()
         centre = find_centre(im=im)
         # plt.imshow(segment)
         # plt.title("Edge object removed from segment")
