@@ -36,8 +36,9 @@ def find_centre(im):
     Returns:
         tuple: The coordinates of the brightest pixel.
     '''
-    max_index = np.unravel_index(np.argmax(im), np.shape(im))
-    if im[max_index] < (np.median(im) + bg_threshold):
+    max_index = np.unravel_index(np.argmax(im.compressed()), np.shape(im))
+    local_bg = get_local_background(im=im, centre=max_index)
+    if im[max_index] < (local_bg + bg_threshold):
         print("All sources found!")
         return None
     return max_index
@@ -556,7 +557,7 @@ def get_local_background(im, centre):
     box = [[centre[0] - bg_box_size, centre[1] - bg_box_size],
            2*bg_box_size + 1, 2*bg_box_size + 1]
     box_im = get_box_image(im=im, box=box)
-    return np.median(box_im)
+    return np.median(box_im.compressed())
 
 
 def finding_masks(im, centre):
@@ -596,22 +597,20 @@ def finding_masks(im, centre):
 
     while True:
         try:
-            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*np.median(box_im))
+            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=threshold)
 
             objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks)
             plot_n_gaussian(box_im=box_im, popt=objs)
             plt.show()
 
-
             # obj = fit_gaussian(box_im=box_im)
             # plot_gaussian(box_im=box_im, popt=obj[0])
-
 
             residuals, chi_sq = get_residuals(box_im=box_im, popt=objs)
             #plot_residuals(residuals, chi_sq)
             plt.show()
 
-            #need to discuss methods 
+            #need to discuss methods
             no_of_objs = len(objs)//9
 
             objs = objs.reshape(no_of_objs, 9)
@@ -628,8 +627,6 @@ def finding_masks(im, centre):
                 flux = np.sum(box_im * bm)
                 flux = flux - local_bg * bm.sum()
                 flux_segment.append(flux)
-                print(f'Background = {local_bg}')
-                print(f'Flux = {flux}')
 
             # ellipse = get_ellipse_params(popt=objs)
             # plot_ellipse(box_im=box_im, ellipse=ellipse)
@@ -688,6 +685,6 @@ def run_photometry():
         with open("fluxes.json", "w") as flux_file:
             json.dump([value for value in fluxes], flux_file)
         centre = find_centre(im=im)
-        plt.imshow(im)
-        plt.title("Edge object removed from segment")
-        plt.show()
+        # plt.imshow(im)
+        # plt.title("Edge object removed from segment")
+        # plt.show()
