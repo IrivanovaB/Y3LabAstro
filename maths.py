@@ -56,6 +56,23 @@ def gaussian_2d(xy, A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C):
     )
 
 
+def gaussian_2d_n(xy, *params):
+    """
+    pn of structure list or array with 
+        A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C
+    """
+    params = np.asarray(params).reshape(-1, 9)
+    x, y = xy
+    multi_fit = np.zeros_like(x, dtype=float)
+    for p in params:
+        A, mu_x, mu_y, sig_x, sig_y, theta, B_x, B_y, C = p
+        multi_fit += gaussian_2d(xy, A, mu_x, mu_y, sig_x, sig_y, theta, B_x, B_y, C)
+
+    return multi_fit
+
+
+
+
 def gaussian_1d_fit(x_data, y_data, p0):
     '''
     Fits to a 1D Gaussian distribution.
@@ -93,3 +110,19 @@ def gaussian_2d_fit(xy_data, z_data, p0):
             [0, 0, 0, 0, 0, 0, -np.inf, -np.inf, 0], np.full(9, np.inf)
         ]
     )
+
+
+def gaussian_2d_n_fit(xy_data, z_data, p0):
+    x_data, y_data = xy_data
+    p0 = np.asarray(p0, dtype=float)
+    p0 = p0.ravel()
+
+    number = len(p0)//9
+
+    standard_bounds = [[0, 0, 0, 0, 0, 0, -np.inf, -np.inf, 0], np.full(9, np.inf)]
+    bounds = np.tile(standard_bounds, (number, 1)).ravel()
+
+    return optimize.curve_fit(
+            gaussian_2d_n, xdata=(x_data.ravel(), y_data.ravel()),
+            ydata=z_data.ravel(), p0=p0
+        )

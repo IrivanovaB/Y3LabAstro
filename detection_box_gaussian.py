@@ -6,12 +6,17 @@ import imageio.v3 as iio
 import cv2
 import json
 from frames import load_mask
-from maths import gaussian_2d, gaussian_2d_fit
+from maths import gaussian_2d, gaussian_2d_fit, gaussian_2d_n, gaussian_2d_n_fit
 
+# from scipy import ndimage
+from skimage.feature import peak_local_max 
 
 # Global variables.
 mosaic = fits.open('Fits_Data/mosaic.fits')
 mosaic_mask = iio.imread('Fits_Data/mask.png')
+
+# blurred_data = ndimage(mosaic[0].data, 3)
+
 image = np.ma.array(mosaic[0].data, mask=load_mask(mosaic_mask))
 box_size = 6
 bg_box_size = 50
@@ -321,10 +326,54 @@ def plot_gaussian(box_im, popt):
 
     fig = plt.figure()
     subfig = fig.add_subplot(111, projection="3d")
-    subfig.plot_surface(x, y, box_im)
-    subfig.plot_surface(x, y, gaussian_2d((x, y), *popt), alpha=0.5)
-    plt.show()
+    subfig.plot_surface(x, y, box_im, label="Data")
+    subfig.plot_surface(x, y, gaussian_2d((x, y), *popt), alpha=0.5, label="Fit")
+    subfig.legend()
+    #plt.show()
 
+def fit_n_gaussian(box_im, peaks):
+    nx, ny = np.shape(box_im)
+    xy = np.meshgrid(range(nx), range(ny))
+    
+    ps = []
+    for peak in peaks:
+        #A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C
+        ps.append([box_im[peak[1], peak[0]], peak[1], peak[0], nx/16, ny/16, np.pi/6, 0, 0, np.median(box_im)])
+
+    return gaussian_2d_n_fit(xy_data=xy, z_data=box_im, p0=ps)
+
+def plot_n_gaussian(box_im, popt):
+    nx, ny = np.shape(box_im)
+    x, y = np.meshgrid(range(nx), range(ny))
+
+    fig = plt.figure()
+    subfig = fig.add_subplot(111, projection="3d")
+    subfig.plot_surface(x, y, box_im, label="Data")
+    subfig.plot_surface(x, y, gaussian_2d_n((x, y), *popt), alpha=0.5, label="Fit")
+    subfig.legend()
+
+def get_residuals(box_im, popt):
+    nx, ny = np.shape(box_im)
+    x, y = np.meshgrid(range(nx), range(ny))
+
+    fit = gaussian_2d_n((x, y), *popt)
+
+    residuals = box_im - fit
+    residuals = np.abs(residuals)
+    chi_squares = residuals*residuals
+    chi_squares = chi_squares/fit
+    return residuals, (np.sum(chi_squares))/(len(chi_squares) - 9)
+
+def plot_residuals(res, chi_sq):
+    nx, ny = np.shape(res)
+    x, y = np.meshgrid(range(nx), range(ny))
+
+    fig = plt.figure()
+    subfig = fig.add_subplot(111, projection="3d")
+    subfig.plot_surface(x, y, res, alpha=0.5, label="Residuals")
+    subfig.legend()
+    # plt.title(chi_sq)
+    # plt.imshow(res)
 
 def get_ellipse_params(popt):
     '''
@@ -535,17 +584,48 @@ def finding_masks(im, centre):
 
     while True:
         try:
-            obj = fit_gaussian(box_im=box_im)
-            plot_gaussian(box_im=box_im, popt=obj[0])
+            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*np.median(box_im))
 
-            ellipse = get_ellipse_params(popt=obj[0])
-            plot_ellipse(box_im=box_im, ellipse=ellipse)
+            objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks)
+            plot_n_gaussian(box_im=box_im, popt=objs)
+            plt.show()
 
-            bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
-            flux = np.sum(box_im * bm)
-            bm_r = 1 - bm
-            bg_flux = np.mean(box_im * bm_r)
-            flux = flux - bg_flux * bm.sum()
+
+            # obj = fit_gaussian(box_im=box_im)
+            # plot_gaussian(box_im=box_im, popt=obj[0])
+
+
+            residuals, chi_sq = get_residuals(box_im=box_im, popt=objs)
+            #plot_residuals(residuals, chi_sq)
+            plt.show()
+
+            #need to discuss methods 
+            no_of_objs = len(objs)//9
+
+            objs = objs.reshape(no_of_objs, 9)
+
+            bms = []
+            flux_segment = []
+            for obj in objs:
+                ellipse = get_ellipse_params(popt=obj)
+                plot_ellipse(box_im=box_im, ellipse=ellipse)
+
+                bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
+                bms.append(bm)
+                flux = np.sum(box_im * bm)
+                bm_r = 1 - bm
+                bg_flux = np.mean(box_im * bm_r)
+                flux = flux - bg_flux * bm.sum()
+                flux_segment.append(flux)
+
+            # ellipse = get_ellipse_params(popt=objs)
+            # plot_ellipse(box_im=box_im, ellipse=ellipse)
+
+            # bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
+            # flux = np.sum(box_im * bm)
+            # bm_r = 1 - bm
+            # bg_flux = np.mean(box_im * bm_r)
+            # flux = flux - bg_flux * bm.sum()
             break
 
         except RuntimeError:
@@ -557,9 +637,11 @@ def finding_masks(im, centre):
 
     xi = np.arange(0, np.shape(box_im)[1], 1)
     yi = np.arange(0, np.shape(box_im)[0], 1)
-    masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
+    for bm_mask in bms:
+        #masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
+        masked_image = get_new_image(xi=xi, yi=yi, mask=bm_mask, box=box, im=im)
 
-    return masked_image, obj, flux
+    return masked_image, objs, flux_segment
 
 
 def main():
@@ -567,6 +649,8 @@ def main():
     Runs the photometry.
     '''
     im = image[2560:4601, 1549:2500]
+
+    im = im[950:1010, 620:680]
     # im = image
     # segment = segment[0:15, 540:590]  #example of an edge object for the segment
 
