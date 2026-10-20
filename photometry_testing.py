@@ -5,7 +5,7 @@ A module for testing the methods in photometry.
 import numpy as np
 import matplotlib.pyplot as plt
 from images import load_image, fit_pixel_histogram
-from detection_box_gaussian import get_box_image
+from photometry import get_box_image
 
 
 # Global variables.
@@ -28,14 +28,14 @@ def generate_random_box(box_size):
     return [[y, x], *box_size]
 
 
-def background_box(sample=5, box_size=[101, 101]):
+def background_box(sample, box_size):
     '''
     Computes mean standard deviation of the local background mean and
     the z-score of the median pixel value of a boxed region.
 
     Args:
-        sample (int): The number of samples. Defaults to 5.
-        box_size (list): The shape of the box. Defaults to [101, 101].
+        sample (int): The number of samples.
+        box_size (list): The shape of the box.
 
     Returns:
         tuple[float, float, float, float, float]: The mean standard
@@ -118,4 +118,13 @@ def backgroud_box_iterated(iteration=100, sample=100, box_size=[101, 101]):
     print(f'Iterations run = {iteration}')
     print(f'Samples per iteration = {sample}')
     print(f'Box size = {box_size}')
-    return
+
+
+def detection_ellipse():
+    '''
+    Computes the number of standard deviations from the centre of the
+    source at which the fitted distribution is within one standard
+    deviation of the local background mean.
+    '''
+
+

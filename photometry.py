@@ -1,5 +1,5 @@
 '''
-A module for photometry.
+A module for the photometry.
 '''
 
 import json
@@ -19,12 +19,6 @@ box_size = 6
 bg_box_size = 50
 bg_threshold = 34
 
-
-# Future considerations:
-# Uncertainty quantification.
-# Identification of overlapping sources.
-# Statistical testing of methods (e.g. Gaussian fit residual).
-# Threshold justification.
 
 # Note that all of the following are in (y, x) instead of (x, y).
 
@@ -491,26 +485,30 @@ def pad_edge_box(box_im, bounds):
     return padded_im, x_i, y_i, mask
 
 
-def get_binary_mask(box_im, ellipse):
+def get_binary_mask(im, box, ellipse):
     '''
     Computes the binary mask.
 
     Args:
-        box_im (arr): The boxed region.
+        im (arr): The image.
+        box_im (arr): The box information.
         ellipse (arr): The parameters of the fitted ellipse.
 
     Returns:
         arr: The binary mask.
     '''
-    object_binary_mask = np.zeros(np.shape(box_im), dtype=np.uint8)
-    center = tuple(np.round(ellipse[0]).astype(int))
+    object_binary_mask = np.zeros(np.shape(im), dtype=np.uint8)
+
+    center = np.round(ellipse[0])
+    center[0] += box[0][1]
+    center[1] += box[0][0]
+    center = tuple(center.astype(int))
     axes = tuple(np.round(np.asarray(ellipse[1]) / 2).astype(int))
 
     object_binary_mask = cv2.ellipse(
         object_binary_mask, center, axes, ellipse[2], 0, 360,
         color=(255, 0, 0), thickness=-1
     )
-
     binary_mask = object_binary_mask/np.max(object_binary_mask)
     return binary_mask
 
@@ -532,10 +530,7 @@ def get_new_image(xi, yi, mask, box, im, plot=False):
     # Refined box.
     rb = [bc[0][1]+xi[0], bc[0][1]+xi[-1], bc[0][0]+yi[0], bc[0][0]+yi[-1]]
 
-    new_image = im
-    new_image[rb[2]:rb[3]+1, rb[0]:rb[1]+1] = np.ma.array(
-        new_image[rb[2]:rb[3]+1, rb[0]:rb[1]+1], mask=mask
-    )
+    new_image = np.ma.array(im, mask=mask)
 
     if plot:
         plt.imshow(new_image)
@@ -547,24 +542,21 @@ def get_new_image(xi, yi, mask, box, im, plot=False):
     return new_image
 
 
-def get_pixel_threshold(im, centre):
+def get_local_background(im, centre):
     '''
-    Computes the threshold on the pixel value at the edge of the box.
-
-    NOTE: The threshold is currently set at 3*std of the local
-    background mean.
+    Computes the local background mean around a source.
 
     Args:
         im (arr): The image.
         centre (tuple): The coordinates of the brightest pixel.
 
     Returns:
-        float: The pixel value threshold.
+        float: The local background mean.
     '''
     box = [[centre[0] - bg_box_size, centre[1] - bg_box_size],
            2*bg_box_size + 1, 2*bg_box_size + 1]
     box_im = get_box_image(im=im, box=box)
-    return np.median(box_im) + bg_threshold
+    return np.median(box_im)
 
 
 def finding_masks(im, centre):
@@ -585,7 +577,8 @@ def finding_masks(im, centre):
     box_im_edge = np.concatenate(
         (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
     )
-    threshold = get_pixel_threshold(im=im, centre=centre)
+    local_bg = get_local_background(im=im, centre=centre)
+    threshold = local_bg + bg_threshold
 
     while (box_im_edge > threshold).sum() > (len(box_im_edge) / 4):
         # i.e. If the number of pixels on the edge that are above the
@@ -629,13 +622,14 @@ def finding_masks(im, centre):
                 ellipse = get_ellipse_params(popt=obj)
                 plot_ellipse(box_im=box_im, ellipse=ellipse)
 
-                bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
+                bm = get_binary_mask(im=im, box=box, ellipse=ellipse)
                 bms.append(bm)
+                bm = get_box_image(im=bm, box=box)
                 flux = np.sum(box_im * bm)
-                bm_r = 1 - bm
-                bg_flux = np.mean(box_im * bm_r)
-                flux = flux - bg_flux * bm.sum()
+                flux = flux - local_bg * bm.sum()
                 flux_segment.append(flux)
+                print(f'Background = {local_bg}')
+                print(f'Flux = {flux}')
 
             # ellipse = get_ellipse_params(popt=objs)
             # plot_ellipse(box_im=box_im, ellipse=ellipse)
@@ -663,7 +657,7 @@ def finding_masks(im, centre):
     return masked_image, objs, flux_segment
 
 
-def main():
+def run_photometry():
     '''
     Runs the photometry.
     '''
@@ -694,6 +688,6 @@ def main():
         with open("fluxes.json", "w") as flux_file:
             json.dump([value for value in fluxes], flux_file)
         centre = find_centre(im=im)
-        # plt.imshow(segment)
-        # plt.title("Edge object removed from segment")
-        # plt.show()
+        plt.imshow(im)
+        plt.title("Edge object removed from segment")
+        plt.show()
