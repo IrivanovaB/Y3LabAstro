@@ -469,6 +469,9 @@ def finding_masks(segment, point, counter):
 
     b0_image = get_box_image(segment, box_0)
 
+    # plt.imshow(b0_image)
+    # plt.show()
+
 
     if box_0[1] != box_0[2]:
         edge_condition = True
@@ -514,7 +517,6 @@ def finding_masks(segment, point, counter):
         bn_image = get_box_image(segment, box_n)
 
         xmus, ymus, xmeds, ymeds = axis_stats(bn_image)
-
         # if (np.shape(bn_image)[0]+7 > np.shape(segment)[0]) or (np.shape(bn_image)[1]+7 > np.shape(segment)[1]):
         #     #i.e. the box for the object is larger than the actual segment we are looking at
         #     #this is ignoring objects that could be at the edges for the moment
@@ -535,13 +537,14 @@ def finding_masks(segment, point, counter):
         if (box_n[1] == prev_box[1]) and (box_n[2] == prev_box[2]): #i.e. if box stops increasing
             break
 
+        print(box_n)
+        plt.imshow(box_n)
+        plt.show()
+
         prev_box=box_n
         c+=1
 
-    plt.imshow(box_n)
-    plt.show()
-
-    #box_in_sky(segment, box_n, point)
+    box_in_sky(segment, box_n, point)
     a, m, s = box_stats(bn_image) #average, median, std
     refined_box, xi, yi, edge_mask = refine_box(bn_image, a, edge_condition)
 
@@ -580,8 +583,8 @@ def main():
 
     while (point != None).any():
         segment, bm, obj = finding_masks(segment, point, counter)
-        masks.append(bm)
-        objects.append(obj)
+        #masks.append(bm)
+        objects.append(obj) 
         point = find_centre(segment)
         plt.imshow(segment)
         plt.title("Edge object removed from segment")
@@ -590,11 +593,10 @@ def main():
 
     return masks, objects
 
-
 m, o = main()
-print(len(o))
+# print(len(o))
+    
 
-# image =image[2560:4601, 1549:2500]
-# #plt.imshow(image[2560:4601, 1549:2500])
-# plt.imshow(image[0:15, 540:590])
-# plt.show()
+    
+
+

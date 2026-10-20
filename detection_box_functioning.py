@@ -1,3 +1,4 @@
+import json
 import numpy as np
 from astropy.io import fits 
 import matplotlib.pyplot as plt
@@ -30,13 +31,46 @@ def create_box(centre, prev_box, bounds):
     """
 
     def edge_box(centre, bounds, dx, dy):
+        """
+        dx : list
+            [x2, x1] ---- where x2 < x1: x2 will be restricted by the boundary x=0, and x1 the boundary bounds[1]
+        dy : list
+            [y2, y1] ---- where y2 < y1: y2 will be restricted by the boundary y=0, and y1 the boundary bounds[0]
+        """
         #coords (y up, y down, x right, x left)
-        cs = np.max(
-            [[bounds[0], 0, bounds[1], 0], [dy[1], dy[0], dx[1], dx[0]]],
-            axis=0
-        )
-        h = np.abs(cs[0] - cs[1])
-        w = np.abs(cs[3] - cs[2])
+        # cs = np.max(
+        #     [[bounds[0], 0, bounds[1], 0], [dy[1], dy[0], dx[1], dx[0]]],
+        #     axis=0
+        # ) #the change in dx and dy can still be within the bounds of the image --> this would overwrite that which would also change the h and w 
+
+        #e.g. point [0, 25] --> dx = [19, 31], dy = [-6, 6] would produce [15, 0, 50, 19] for segment shape (15, 50) when we would want 
+        # (0, 19) (6, 31) for (y2, x2) (y1, x1)
+        # makes a massive difference when passing in the entire image as a whole!
+
+        cs = [0, 0, 0, 0] #(y2, x2, y1, x1)
+
+        if dy[0] < 0: #if y2 goes beyond the top of the image
+            cs[0] = 0
+        else:
+            cs[0] = dy[0] 
+
+        if (dy[1] > bounds[0] -1): #if y1 goes beyond the bottom of the image #not sure if this will need to be -1 or not
+            cs[2] = bounds[0] 
+        else:
+            cs[2] = dy[1] 
+
+        if dx[1] > bounds[1]: #if x1 goes beyond the right of the image
+            cs[3] = bounds[1]
+        else:
+            cs[3] = dx[1] 
+        
+        if dx[0] < 0: #if x2 goes beyond the left of the image
+            cs[1] = 0
+        else:
+            cs[1] = dx[0] 
+
+        h = np.abs(cs[0] - cs[2])
+        w = np.abs(cs[1] - cs[3])
         return cs, h, w
 
     if prev_box is None:
@@ -48,12 +82,13 @@ def create_box(centre, prev_box, bounds):
             #similarly for dy
 
             cs, h, w = edge_box(centre, bounds, dx, dy)
+            #cs is (y2, x2, y1, x1)
 
-            return [[cs[1], cs[3]], h, w]    #starting in the bottom left (i.e. top left i think)
+            return [[cs[0], cs[1]], h, w]    #starting in the bottom left (i.e. top left i think)
 
         return [[centre[0]-6, centre[1]-6], 13, 13] #starting coords of the top left corner, h,w
     # this works
-    h,w = prev_box[2], prev_box[1]
+    h, w = prev_box[1], prev_box[2]
     if h!= w: #i.e. working with a box on the edge
         c = [prev_box[0][0], prev_box[0][1]] #the corner
 
@@ -62,7 +97,7 @@ def create_box(centre, prev_box, bounds):
 
         cs, h, w = edge_box(centre, bounds, dx, dy)
 
-        return [[cs[1], cs[3]], h, w]
+        return [[cs[0], cs[1]], h, w]
     return [[prev_box[0][0]-6, prev_box[0][1]-6], h+12, w+12]
 
 
@@ -281,6 +316,50 @@ def refine_box(box, a):
     return rb, x_i, y_i
 
 
+def pad_edge_box(im, bounds):
+    half_shape = np.shape(im)
+    midpoint_x = half_shape[1]
+    midpoint_y = half_shape[0]
+
+    x_i = np.arange(0, midpoint_x, 1)
+    y_i = np.arange(0, midpoint_y, 1)
+
+    fill = np.average(im)
+
+    if (x_i == 0).any() or (x_i >= bounds[1]-1).any(): #i.e. the object is on the edge top or bottom
+        padded_im = np.zeros((half_shape[0], half_shape[1]*2))
+        print(np.shape(padded_im))
+        print(np.shape(im))
+        print(midpoint_x)
+        mask = np.zeros((half_shape[0], half_shape[1]*2))
+        if (x_i == 0).any() or (y_i == 0).any():
+            padded_im[:, midpoint_x:] = im
+            padded_im[:, :midpoint_x] = fill
+            mask[:, midpoint_x:] = 1
+        else:
+            padded_im[:midpoint_y, :] = im
+            padded_im[midpoint_y:, :] = fill
+            mask[:midpoint_y, :] = 1
+    elif (y_i == 0).any() or (y_i >= bounds[0]-1).any(): #object on the top or bottom edge
+        padded_im = np.zeros((half_shape[0]*2, half_shape[1]))
+        mask = np.zeros((half_shape[0]*2, half_shape[1]))
+        if (y_i == 0).any():
+            # im[midpoint_y:, :] = rb
+            # im[:midpoint_y, :] = fill
+            # mask[midpoint_y:, :] = 1
+            padded_im[:, midpoint_x:] = im
+            padded_im[:, :midpoint_x] = fill
+            mask[:, midpoint_x:] = 1
+        else:
+            padded_im[:midpoint_y, :] = im
+            padded_im[midpoint_y:, :] = fill
+            mask[midpoint_y:, :] = 1
+    else:
+        print("idk man")
+
+    return padded_im, x_i, y_i, mask
+
+
 def get_binary_mask(box, ellipse):
     """
     where box is the refined box
@@ -408,9 +487,10 @@ def finding_masks(segment, point, counter):
     # plt.show()
 
     box_1 = create_box(point, box_0, boundaries)
-    # print(f"box_1 {box_1}")
+    
     b1_image = get_box_image(segment, box_1)
 
+    # print(f"box_1 {box_1}")
     # plt.imshow(b1_image)
     # plt.title("b1 image")
     # plt.show()
@@ -473,9 +553,30 @@ def finding_masks(segment, point, counter):
     a, m, s = box_stats(bn_image) #average, median, std
     #refined_box, xi, yi = refine_box(bn_image, a)
     refined_box = bn_image
+
+    if box_n[1] != box_n[2]:
+        refined_box, xi, yi, refine_mask = pad_edge_box(refined_box, boundaries)
+
     obj = fit_ellipse(refined_box, m)
     plot_ellipse(refined_box, obj)
+
+    # plt.imshow(refined_box)
+    # plt.show()
+
+
+    #plot_ellipse(refined_box, obj)
     bm, rm = get_masks(refined_box, obj)
+
+    bm_r = 1 - bm
+    ell = refined_box*bm_r
+
+    flux_sum = np.sum(ell)
+    no = np.sum(bm_r)
+
+    back = refined_box*bm
+    back_av = np.average(back)
+
+    flux = flux_sum - no*back_av
 
     # plt.imshow(rm)
     # plt.title("Relative Mask")
@@ -485,12 +586,15 @@ def finding_masks(segment, point, counter):
     xi = np.arange(0, np.shape(bn_image)[1], 1)
     yi = np.arange(0, np.shape(bn_image)[0], 1)
     masked_image = plot_new_image(xi, yi, bm, box_n, segment)
-    return masked_image, bm, obj
+    return masked_image, obj, flux 
 
 
 def main():
     segment = image[2560:4601, 1549:2500]
-    # segment = segment[0:15, 540:590]  #example of an edge object for the segment
+    #segment = segment[0:15, 540:590]  #example of an edge object for the segment
+
+    # #segment = np.transpose(segment)
+    # #segment = segment[::-1, ::-1]
 
     point = find_centre(segment)
 
@@ -498,26 +602,33 @@ def main():
     plt.title("Original segment")
     plt.show()
 
-    masks = []
     objects = []
+    fluxes = []
+    with open("fluxes.json", "w") as flux_file:
+        json.dump(fluxes, flux_file)
 
     counter = 1
 
     while (point != None).any():
-        segment, bm, obj = finding_masks(segment, point, counter)
-        masks.append(bm)
+        segment, obj, flux = finding_masks(segment, point, counter)
+        #masks.append(bm)
         objects.append(obj)
+        fluxes.append(flux)
+        with open("fluxes.json", "w") as flux_file:
+            json.dump([float(value) for value in fluxes], flux_file)
         point = find_centre(segment)
-        plt.imshow(segment)
-        plt.title("Edge object removed from segment")
-        plt.show()
+        # plt.imshow(segment)
+        # plt.title("Edge object removed from segment")
+        # plt.show()
         counter += 1
 
-    return masks, objects
+    return objects, fluxes
 
 
-m, o = main()
+o, f = main()
 print(len(o))
+
+
 
 # image =image[2560:4601, 1549:2500]
 # #plt.imshow(image[2560:4601, 1549:2500])
