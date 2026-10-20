@@ -339,7 +339,7 @@ def get_ellipse_params(popt):
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
             rotation angle.
     '''
-    return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 180/np.pi*popt[5]
+    return (popt[1], popt[2]), (10*popt[3], 10*popt[4]), 180/np.pi*popt[5]
 
 
 def plot_ellipse(box_im, ellipse):
@@ -527,7 +527,6 @@ def finding_masks(im, centre):
         box_im_edge = np.concatenate(
             (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
         )
-        box_in_sky(im=im, box=box, centre=centre)
 
     box_in_sky(im=im, box=box, centre=centre)
 

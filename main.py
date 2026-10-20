@@ -2,18 +2,14 @@ import numpy as np
 from astropy.io import fits
 import matplotlib.pyplot as plt
 import imageio.v3 as iio
-from image_containers import ImageContainer
+from images import load_image, plot_pixel_histogram
 
-#Read in our analysis image
-image = fits.open("Fits_Data/mosaic.fits")
-mask = iio.imread('Fits_Data/mask.png')
-# data = hdu[0].data
+
+# Read in our analysis image.
+image = load_image()
 
 # Plots the histogram.
-mosaic = ImageContainer(image=image[0].data)
-mosaic.import_mask(mask=mask)
-mosaic.plot_image()
-# mosaic.plot_pixel_hist(p0=[2e6, 3400, 10])
+plot_pixel_histogram(im=image, p0=[2e6, 3400, 10])
 
 
 # def plot_mask_image(image, mask):
