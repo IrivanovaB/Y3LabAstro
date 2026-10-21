@@ -336,13 +336,17 @@ def plot_gaussian(box_im, popt):
     #plt.show()
 
 def fit_n_gaussian(box_im, peaks):
-    nx, ny = np.shape(box_im)
+    ny, nx = np.shape(box_im)
     xy = np.meshgrid(range(nx), range(ny))
-    
+
     ps = []
     for peak in peaks:
         #A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C
-        ps.append([box_im[peak[1], peak[0]], peak[0], peak[1], nx/16, ny/16, np.pi/6, 0, 0, np.median(box_im)])
+        ps.append([box_im[peak[1], peak[0]], peak[0], peak[1], nx/30, ny/30, np.pi/6, 0, 0, np.median(box_im)])
+
+    #Trying to resolve the error of curve fit returning []. 
+    ps = np.array(ps, dtype=float)
+    ps = ps.flatten()
 
     return gaussian_2d_n_fit(xy_data=xy, z_data=box_im, p0=ps)
 
@@ -392,7 +396,11 @@ def get_ellipse_params(popt):
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
             rotation angle.
     '''
-    return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 180-180/np.pi*popt[5]
+    net_turn = popt[5]/(2*np.pi) - popt[5]//(2*np.pi) 
+
+    # return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 180-180/np.pi*popt[5]
+    return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 90 - 180*net_turn/(np.pi)
+
 
 
 def plot_ellipse(box_im, ellipse):
@@ -495,6 +503,8 @@ def get_binary_mask(box_im, ellipse):
     '''
     object_binary_mask = np.zeros(np.shape(box_im), dtype=np.uint8)
     center = tuple(np.round(ellipse[0]).astype(int))
+    center = tuple((center[1], center[0])) #just some error
+
     axes = tuple(np.round(np.asarray(ellipse[1]) / 2).astype(int))
 
     object_binary_mask = cv2.ellipse(
@@ -680,6 +690,7 @@ def finding_masks(im, centre):
             else:
                 peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*np.median(box_im))
 
+                
                 if len(peaks) == 0:
                     peaks = [[centre[1], centre[0]]]
 
@@ -723,6 +734,9 @@ def finding_masks(im, centre):
              
             break
 
+        except RuntimeError as exc:
+            print(f"Gaussian fit failed: {exc}")
+            raise
         except RuntimeError:
             bm = np.where(box_im > np.median(box_im),
                           np.ones_like(box_im), np.zeros_like(box_im))
@@ -730,10 +744,15 @@ def finding_masks(im, centre):
             flux = np.nan
             break
 
+    print("objects")
+    print(objs)
+
     masked_image = im 
     for bm_mask in bms:
         #masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
         masked_image = get_new_image(mask=bm_mask, box=box, im=masked_image, padded_image=box_im, edge_mask=edge_mask)
+        plt.imshow(masked_image)
+        plt.show()
 
     return masked_image, objs, flux_segment
 

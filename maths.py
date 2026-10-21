@@ -114,15 +114,18 @@ def gaussian_2d_fit(xy_data, z_data, p0):
 
 def gaussian_2d_n_fit(xy_data, z_data, p0):
     x_data, y_data = xy_data
-    p0 = np.asarray(p0, dtype=float)
-    p0 = p0.ravel()
+    #p0 = np.asarray(p0, dtype=float)
+    #p0 = p0.flatten()
 
     number = len(p0)//9
 
-    standard_bounds = [[0, 0, 0, 0, 0, 0, -np.inf, -np.inf, 0], np.full(9, np.inf)]
-    bounds = np.tile(standard_bounds, (number, 1)).ravel()
+    #standard_bounds = [[0, 0, 0, 0, 0, 0, -np.inf, -np.inf, 0], np.full(9, np.inf)]
+    lb = (0, 0, 0, 0, 0, 0, -np.inf, -np.inf, 0)
+    ub = (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf)
+    bounds = (np.tile(lb, (number, 1)).ravel(), np.tile(ub, (number, 1)).ravel())
+    #bounds = np.tile(standard_bounds, (number, 1)).ravel()
 
     return optimize.curve_fit(
             gaussian_2d_n, xdata=(x_data.ravel(), y_data.ravel()),
-            ydata=z_data.ravel(), p0=p0
+            ydata=z_data.ravel(), p0=p0, bounds=bounds
         )
