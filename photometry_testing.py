@@ -5,7 +5,7 @@ A module for testing the methods in photometry.
 import numpy as np
 import matplotlib.pyplot as plt
 from images import load_image, fit_pixel_histogram
-from photometry import get_box_image, find_centre, get_local_background, box_in_sky
+from detection_box_gaussian import get_box_image, find_centre, get_local_background, fit_gaussian, plot_gaussian
 
 
 # Global variables.
@@ -75,7 +75,18 @@ def background_box(sample=10000, box_size=[101, 101]):
     print(f'Box size = {box_size}')
 
 
-def detection_ellipse(sample=10000, box_size=[101, 101]):
+def get_ellipse_axes():
+    '''
+    Locates the pixels that lie on the semi-major and semi-minor axes
+    of the ellipse.
+
+    Args:
+
+    Returns:
+
+    '''
+
+def detection_ellipse(sample=10, box_size=[101, 101]):
     '''
     Computes the number of standard deviations from the centre of the
     source at which the fitted distribution is within one pixel of the
@@ -99,6 +110,8 @@ def detection_ellipse(sample=10000, box_size=[101, 101]):
         max_index_shifted = [max_index[0]+box[0][0], max_index[1]+box[0][1]]
         local_bg = get_local_background(im=image, centre=max_index_shifted)
         std = np.sqrt(2 * np.log(max_value - local_bg))
+        popt, pcov = fit_gaussian(box_im=im)
+
         if not np.isfinite(std):
             continue
         std_no.append(std)
@@ -107,7 +120,7 @@ def detection_ellipse(sample=10000, box_size=[101, 101]):
     plt.hist(std_no, bins=np.arange(0, 5, 0.1), density=True)
     plt.xlabel('Standard deviation')
     plt.tight_layout()
-    plt.savefig('figures/detection_ellipse', dpi=300)
+    # plt.savefig('figures/detection_ellipse', dpi=300)
     plt.show()
 
     std_no_err = np.std(std_no)
