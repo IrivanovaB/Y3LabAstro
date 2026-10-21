@@ -17,7 +17,9 @@ from maths import (gaussian_2d, gaussian_2d_fit,
 image = load_image()
 box_size = 6
 bg_box_size = 50
-bg_threshold = 34
+bg_threshold = 11
+global_bg = 3420
+ellipse_size = 10
 
 
 # Note that all of the following are in (y, x) instead of (x, y).
@@ -27,8 +29,8 @@ def find_centre(im):
     '''
     Finds the coordinates of the brightest pixel in an image.
 
-    NOTE: The detection threshold currently is set at 3*std of the
-    local background mean.
+    NOTE: The detection threshold currently is set at 1*std of the
+    global background mean.
 
     Args:
         im (arr): The image.
@@ -37,8 +39,7 @@ def find_centre(im):
         tuple: The coordinates of the brightest pixel.
     '''
     max_index = np.unravel_index(np.argmax(im), np.shape(im))
-    local_bg = get_local_background(im=im, centre=max_index)
-    if im[max_index] < (local_bg + bg_threshold):
+    if im[max_index] < (global_bg + bg_threshold):
         print("All sources found!")
         return None
     return max_index
@@ -395,7 +396,7 @@ def plot_residuals(res, chi_sq):
     # plt.imshow(res)
 
 
-def get_ellipse_params(popt):
+def get_ellipse_params(popt, size=ellipse_size):
     '''
     Converts the fitted values into the ellipse parameters.
 
@@ -403,6 +404,8 @@ def get_ellipse_params(popt):
 
     Args:
         popt (arr): The fitted values.
+        size (int): The number of standard deviations to take as the
+            semi-major and semi-minor axes. Defaults to ellipse_size.
 
     Returns:
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
@@ -411,7 +414,7 @@ def get_ellipse_params(popt):
     net_turn = popt[5]/(2*np.pi) - popt[5]//(2*np.pi)
 
     # return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 180-180/np.pi*popt[5]
-    return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 90 - 180*net_turn/(np.pi)
+    return (popt[2], popt[1]), (size*popt[4], size*popt[3]), 90 - 180*net_turn/(np.pi)
 
 
 def plot_ellipse(box_im, ellipse):
@@ -496,7 +499,6 @@ def pad_edge_box(box_im, bounds, source):
             mask[:, :midpoint_x] = 0
     else:
         print("idk man")
-
 
     return padded_im, mask
 
@@ -789,7 +791,7 @@ def finding_masks(im, centre):
     print("objects")
     print(objs)
 
-    masked_image = im 
+    masked_image = im
     for bm_mask in bms:
         #masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
         masked_image = get_new_image(mask=bm_mask, box=box, im=masked_image, padded_image=box_im, edge_mask=edge_mask)
@@ -839,6 +841,7 @@ def run_photometry():
         # plt.imshow(segment)
         # plt.title("Edge object removed from segment")
         # plt.show()
+        print(len(fluxes))
 
 
 run_photometry()
