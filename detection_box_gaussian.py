@@ -1,32 +1,24 @@
+'''
+A module for the photometry.
+'''
+
+import json
 import numpy as np
-from astropy.io import fits
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
-import imageio.v3 as iio
 import cv2
-import json
-from frames import load_mask
-from maths import gaussian_2d, gaussian_2d_fit, gaussian_2d_n, gaussian_2d_n_fit
+from skimage.feature import peak_local_max
+from images import load_image
+from maths import (gaussian_2d, gaussian_2d_fit,
+                   gaussian_2d_n, gaussian_2d_n_fit)
 
-# from scipy import ndimage
-from skimage.feature import peak_local_max 
 
 # Global variables.
-mosaic = fits.open('Fits_Data/mosaic.fits')
-mosaic_mask = iio.imread('Fits_Data/mask.png')
-
-# blurred_data = ndimage(mosaic[0].data, 3)
-
-image = np.ma.array(mosaic[0].data, mask=load_mask(mosaic_mask))
+image = load_image()
 box_size = 6
 bg_box_size = 50
+bg_threshold = 34
 
-
-# Future considerations:
-# Uncertainty quantification.
-# Identification of overlapping sources.
-# Statistical testing of methods (e.g. Gaussian fit residual).
-# Threshold justification.
 
 # Note that all of the following are in (y, x) instead of (x, y).
 
@@ -35,8 +27,8 @@ def find_centre(im):
     '''
     Finds the coordinates of the brightest pixel in an image.
 
-    NOTE: The detection threshold currently is set at the median pixel
-    value of the image + 20.
+    NOTE: The detection threshold currently is set at 3*std of the
+    local background mean.
 
     Args:
         im (arr): The image.
@@ -44,8 +36,9 @@ def find_centre(im):
     Returns:
         tuple: The coordinates of the brightest pixel.
     '''
-    max_index = np.unravel_index(np.argmax(im), np.shape(im))
-    if im[max_index] < (np.median(im) + 20):
+    max_index = np.unravel_index(np.argmax(im.compressed()), np.shape(im))
+    local_bg = get_local_background(im=im, centre=max_index)
+    if im[max_index] < (local_bg + bg_threshold):
         print("All sources found!")
         return None
     return max_index
@@ -372,7 +365,11 @@ def get_residuals(box_im, popt):
     chi_squares = chi_squares/fit
     return residuals, (np.sum(chi_squares))/(len(chi_squares) - 9)
 
+
 def plot_residuals(res, chi_sq):
+    '''
+    Plots the residual of the fit.
+    '''
     nx, ny = np.shape(res)
     x, y = np.meshgrid(range(nx), range(ny))
 
@@ -490,8 +487,9 @@ def pad_edge_box(box_im, bounds, source):
     return padded_im, mask
 
 
-def get_binary_mask(box_im, ellipse):
+def get_binary_mask_historic(box_im, ellipse):
     '''
+    #just an old version in case we needed it 
     Computes the binary mask.
 
     Args:
@@ -512,6 +510,34 @@ def get_binary_mask(box_im, ellipse):
         color=(255, 0, 0), thickness=-1
     )
 
+    binary_mask = object_binary_mask/np.max(object_binary_mask)
+    return binary_mask
+
+def get_binary_mask(im, box, ellipse):
+    '''
+    Computes the binary mask.
+
+    Args:
+        im (arr): The image.
+        box_im (arr): The box information.
+        ellipse (arr): The parameters of the fitted ellipse.
+
+    Returns:
+        arr: The binary mask.
+    '''
+    object_binary_mask = np.zeros(np.shape(im), dtype=np.uint8)
+
+    center = np.round(ellipse[0])
+    center[0], center[1] = center[1], center[0]
+    center[0] += box[0][1]
+    center[1] += box[0][0]
+    center = tuple(center.astype(int))
+    axes = tuple(np.round(np.asarray(ellipse[1]) / 2).astype(int))
+
+    object_binary_mask = cv2.ellipse(
+        object_binary_mask, center, axes, ellipse[2], 0, 360,
+        color=(255, 0, 0), thickness=-1
+    )
     binary_mask = object_binary_mask/np.max(object_binary_mask)
     return binary_mask
 
@@ -604,23 +630,24 @@ def plot_ellipse_edge(im, ellipse):
     ax.set_aspect("equal")
     plt.show()
 
-def get_pixel_threshold(im, centre):
+def get_local_background(im, centre):
     '''
     Computes the threshold on the pixel value at the edge of the box.
 
     NOTE: The threshold is currently set at the median + 20.
+    Computes the local background mean around a source.
 
     Args:
         im (arr): The image.
         centre (tuple): The coordinates of the brightest pixel.
 
     Returns:
-        float: The pixel value threshold.
+        float: The local background mean.
     '''
     box = [[centre[0] - bg_box_size, centre[1] - bg_box_size],
            2*bg_box_size + 1, 2*bg_box_size + 1]
     box_im = get_box_image(im=im, box=box)
-    return np.median(box_im) + 20
+    return np.median(box_im.compressed())
 
 
 def finding_masks(im, centre):
@@ -641,7 +668,8 @@ def finding_masks(im, centre):
     box_im_edge = np.concatenate(
         (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
     )
-    threshold = get_pixel_threshold(im=im, centre=centre)
+    local_bg = get_local_background(im=im, centre=centre)
+    threshold = local_bg + bg_threshold
 
     while (box_im_edge > threshold).sum() > (len(box_im_edge) / 4):
         # i.e. If the number of pixels on the edge that are above the
@@ -679,7 +707,7 @@ def finding_masks(im, centre):
                 objs = fit_ellipse(box_im, np.median(box_im))
                 #plot_ellipse_edge(box_im, objs)
 
-                bm = get_binary_mask(box_im=box_im, ellipse=objs)
+                bm = get_binary_mask(im=im, box=box, ellipse=objs)
 
                 bms.append(bm)
                 flux = np.sum(box_im * bm)
@@ -757,7 +785,7 @@ def finding_masks(im, centre):
     return masked_image, objs, flux_segment
 
 
-def main():
+def run_photometry():
     '''
     Runs the photometry.
     '''
@@ -799,4 +827,4 @@ def main():
         # plt.show()
 
 
-main()
+run_photometry()
