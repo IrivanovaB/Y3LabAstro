@@ -28,7 +28,7 @@ def generate_random_box(box_size):
     return [[y, x], *box_size]
 
 
-def backgroud_box(sample=10000, box_size=[101, 101], plot=False):
+def background_box(sample=10000, box_size=[101, 101]):
     '''
     Computes mean standard deviation of the local background mean and
     the z-score of the median pixel value of a boxed region.
@@ -36,8 +36,6 @@ def backgroud_box(sample=10000, box_size=[101, 101], plot=False):
     Args:
         sample (int): The number of samples. Defaults to 10000.
         box_size (list): The shape of the box. Defaults to [101, 101].
-        plot (bool): If True, plots the distribution of the z-score.
-            Defaults to False.
     '''
     box_area = box_size[0]*box_size[1]
     std = []
@@ -55,12 +53,13 @@ def backgroud_box(sample=10000, box_size=[101, 101], plot=False):
             i += 1
         except Exception:
             continue
-    if plot:
-        plt.hist(z_score, bins=np.arange(-0.5, 0.51, 0.01), density=True)
-        plt.xlabel('z-score')
-        plt.tight_layout()
-        # plt.savefig('figures/background_box_median_z_score', dpi=300)
-        plt.show()
+
+    plt.hist(z_score, bins=np.arange(-0.5, 0.51, 0.01), density=True)
+    plt.xlabel('z-score')
+    plt.tight_layout()
+    # plt.savefig('figures/background_box_median_z_score', dpi=300)
+    plt.show()
+
     std_err = np.std(std)
     std = np.mean(std)
     z_score = np.abs(np.array(z_score))
@@ -76,7 +75,7 @@ def backgroud_box(sample=10000, box_size=[101, 101], plot=False):
     print(f'Box size = {box_size}')
 
 
-def detection_ellipse(sample=10000, box_size=[101, 101], plot=True):
+def detection_ellipse(sample=10000, box_size=[101, 101]):
     '''
     Computes the number of standard deviations from the centre of the
     source at which the fitted distribution is within one pixel of the
@@ -85,9 +84,6 @@ def detection_ellipse(sample=10000, box_size=[101, 101], plot=True):
     Args:
         sample (int): The number of samples. Defaults to 10000.
         box_size (list): The shape of the box. Defaults to [101, 101].
-        plot (bool): If True, plots the distribution of the number of
-            standard deviations to reach the threshold. Defaults to
-            False.
     '''
     i = 0
     std_no = []
@@ -97,21 +93,26 @@ def detection_ellipse(sample=10000, box_size=[101, 101], plot=True):
         if len(im.compressed()) == 0:
             continue
         max_index = find_centre(im=im)
-        if max_index is None:
-            continue
         max_value = im[max_index]
+        if np.ma.is_masked(max_value) or not np.isfinite(max_value):
+            continue
         max_index_shifted = [max_index[0]+box[0][0], max_index[1]+box[0][1]]
         local_bg = get_local_background(im=image, centre=max_index_shifted)
         std = np.sqrt(2 * np.log(max_value - local_bg))
+        if not np.isfinite(std):
+            continue
         std_no.append(std)
         i += 1
-    if plot:
-        plt.hist(std_no, density=True)
-        plt.xlabel('Standard deviation')
-        plt.tight_layout()
-        # plt.savefig('figures/detection_ellipse', dpi=300)
-        plt.show()
+
+    plt.hist(std_no, bins=np.arange(0, 5, 0.1), density=True)
+    plt.xlabel('Standard deviation')
+    plt.tight_layout()
+    plt.savefig('figures/detection_ellipse', dpi=300)
+    plt.show()
+
     std_no_err = np.std(std_no)
     std_no_mean = np.mean(std_no)
     print('STATISTICS')
     print(f'Number of std = {std_no_mean:.4f} +/- {std_no_err:.4f}')
+    print(f'Samples = {sample}')
+    print(f'Box size = {box_size}')
