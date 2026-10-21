@@ -36,7 +36,7 @@ def find_centre(im):
     Returns:
         tuple: The coordinates of the brightest pixel.
     '''
-    max_index = np.unravel_index(np.argmax(im.compressed()), np.shape(im))
+    max_index = np.unravel_index(np.argmax(im), np.shape(im))
     local_bg = get_local_background(im=im, centre=max_index)
     if im[max_index] < (local_bg + bg_threshold):
         print("All sources found!")
@@ -559,7 +559,12 @@ def get_new_image(mask, box, im, padded_image, edge_mask, plot=False):
     box_im = get_box_image(im=im, box=box)
     new_image = im
 
-    if (padded_image == None).all():
+    if (padded_image != None).any():
+        plt.imshow(mask)
+        plt.show()
+
+        plt.imshow(edge_mask)
+        plt.show()
         combined_mask = np.ma.mask_or(mask, edge_mask)
         #masked_image = np.ma.array(padded_image, mask=combined_mask)
 
@@ -581,6 +586,7 @@ def get_new_image(mask, box, im, padded_image, edge_mask, plot=False):
         )
 
     plt.imshow(new_image)
+    plt.title("Hopefully unpadded and masked")
     plt.show()
 
     if plot:
@@ -708,11 +714,12 @@ def finding_masks(im, centre):
                 #plot_ellipse_edge(box_im, objs)
 
                 bm = get_binary_mask(im=im, box=box, ellipse=objs)
+                #bm = get_binary_mask_historic(box_im=box_im, ellipse=objs)
 
                 bms.append(bm)
-                flux = np.sum(box_im * bm)
+                flux = np.sum(im * bm)
                 bm_r = 1 - bm
-                bg_flux = np.mean(box_im * bm_r)
+                bg_flux = np.mean(im * bm_r)
                 flux = flux - bg_flux * bm.sum()
                 flux_segment.append(flux)
             else:
@@ -743,11 +750,12 @@ def finding_masks(im, centre):
                     ellipse = get_ellipse_params(popt=obj)
                     #plot_ellipse(box_im=box_im, ellipse=ellipse)
 
-                    bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
+                    #bm = get_binary_mask_historic(box_im=box_im, ellipse=ellipse)
+                    bm = get_binary_mask(im=im, box=box, ellipse=ellipse)
                     bms.append(bm)
-                    flux = np.sum(box_im * bm)
+                    flux = np.sum(im * bm)
                     bm_r = 1 - bm
-                    bg_flux = np.mean(box_im * bm_r)
+                    bg_flux = np.mean(im * bm_r)
                     flux = flux - bg_flux * bm.sum()
                     flux_segment.append(flux) 
 
@@ -772,15 +780,10 @@ def finding_masks(im, centre):
             flux = np.nan
             break
 
-    print("objects")
-    print(objs)
-
     masked_image = im 
     for bm_mask in bms:
         #masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
         masked_image = get_new_image(mask=bm_mask, box=box, im=masked_image, padded_image=box_im, edge_mask=edge_mask)
-        plt.imshow(masked_image)
-        plt.show()
 
     return masked_image, objs, flux_segment
 
@@ -791,12 +794,12 @@ def run_photometry():
     '''
     im = image[2560:4601, 1549:2500]
 
-    im = im[950:1010, 620:680]
+    #im = im[950:1010, 620:680]
     # im = image
-    # im = im[0:15, 540:590]  #example of an edge object for the segment
+    im = im[0:15, 540:590]  #example of an edge object for the segment
 
-    #im = np.transpose(im)
-    #im = im[::-1, ::-1]
+    im = np.transpose(im)
+    im = im[::-1, ::-1]
 
     centre = find_centre(im=im)
 

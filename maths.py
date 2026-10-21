@@ -137,5 +137,4 @@ def gaussian_2d_n_fit(xy_data, z_data, p0):
     return optimize.curve_fit(
             gaussian_2d_n, xdata=(x_data.ravel(), y_data.ravel()),
             ydata=z_data.ravel(), p0=p0, bounds=bounds
-            ydata=z_data.ravel(), p0=p0, bounds=bounds
         )
