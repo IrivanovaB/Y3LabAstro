@@ -6,20 +6,22 @@ import numpy as np
 from scipy import optimize
 
 
-def gaussian_1d(x, A, mu, sigma):
+def gaussian_1d(x, A, mu, sigma, B, C):
     '''
-    A 1D Gaussian distribution.
+    A 1D Gaussian distribution with a background plane.
 
     Args:
         x (float): The x value.
         A (float): The normalisation factor.
         mu (float): The expected value.
         sigma (float): The standard deviation.
+        B (float): The slope of the background plane.
+        C (float): The y-intercept of the background plane.
 
     Returns:
         float: The Gaussian distribution evaluated at x.
     '''
-    return A * np.exp(- (x-mu)**2 / (2 * sigma**2))
+    return A*np.exp(- (x-mu)**2 / (2*sigma**2)) + B*x + C
 
 
 def gaussian_2d(xy, A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C):
@@ -57,20 +59,24 @@ def gaussian_2d(xy, A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C):
 
 
 def gaussian_2d_n(xy, *params):
-    """
-    pn of structure list or array with 
-        A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C
-    """
+    '''
+    Fits to n Gaussian distributions with a background plane.
+
+    Args:
+        xy (arr): The x and y values.
+        params (arr): The distribution parameters.
+
+    Returns:
+        float: The Gaussian distributions evaluated at (x, y).
+    '''
     params = np.asarray(params).reshape(-1, 9)
     x, y = xy
     multi_fit = np.zeros_like(x, dtype=float)
     for p in params:
         A, mu_x, mu_y, sig_x, sig_y, theta, B_x, B_y, C = p
-        multi_fit += gaussian_2d(xy, A, mu_x, mu_y, sig_x, sig_y, theta, B_x, B_y, C)
-
+        multi_fit += gaussian_2d(xy, A, mu_x, mu_y, sig_x, sig_y, theta,
+                                 B_x, B_y, C)
     return multi_fit
-
-
 
 
 def gaussian_1d_fit(x_data, y_data, p0):
@@ -87,7 +93,7 @@ def gaussian_1d_fit(x_data, y_data, p0):
     '''
     return optimize.curve_fit(
         gaussian_1d, xdata=x_data, ydata=y_data, p0=p0,
-        bounds=[[0, 0, 0], [np.inf, np.inf, np.inf]]
+        bounds=[[0, 0, 0, -np.inf, 0], np.full(5, np.inf)]
     )
 
 
@@ -113,16 +119,19 @@ def gaussian_2d_fit(xy_data, z_data, p0):
 
 
 def gaussian_2d_n_fit(xy_data, z_data, p0):
+    '''
+    Fits to n Gaussian distributions with a background plane.
+    '''
     x_data, y_data = xy_data
     p0 = np.asarray(p0, dtype=float)
     p0 = p0.ravel()
 
     number = len(p0)//9
 
-    standard_bounds = [[0, 0, 0, 0, 0, 0, -np.inf, -np.inf, 0], np.full(9, np.inf)]
-    bounds = np.tile(standard_bounds, (number, 1)).ravel()
+    bounds = [[0, 0, 0, 0, 0, 0, -np.inf, -np.inf, 0]*number,
+              np.full(len(p0), np.inf)]
 
     return optimize.curve_fit(
             gaussian_2d_n, xdata=(x_data.ravel(), y_data.ravel()),
-            ydata=z_data.ravel(), p0=p0
+            ydata=z_data.ravel(), p0=p0, bounds=bounds
         )
