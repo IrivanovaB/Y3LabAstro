@@ -18,6 +18,7 @@ image = load_image()
 box_size = 6
 bg_box_size = 50
 bg_threshold = 34
+ellipse_size = 10
 
 
 # Note that all of the following are in (y, x) instead of (x, y).
@@ -36,9 +37,8 @@ def find_centre(im):
     Returns:
         tuple: The coordinates of the brightest pixel.
     '''
-    max_index = np.unravel_index(np.argmax(im.compressed()), np.shape(im))
-    local_bg = get_local_background(im=im, centre=max_index)
-    if im[max_index] < (local_bg + bg_threshold):
+    max_index = np.unravel_index(np.argmax(im), np.shape(im))
+    if im[max_index] < (np.median(im) + bg_threshold):
         print("All sources found!")
         return None
     return max_index
@@ -401,7 +401,8 @@ def get_ellipse_params(popt):
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
             rotation angle.
     '''
-    return (popt[1], popt[2]), (10*popt[3], 10*popt[4]), 180-180/np.pi*popt[5]
+    return ((popt[1], popt[2]), (ellipse_size*popt[3], ellipse_size*popt[4]),
+            180-180/np.pi*popt[5])
 
 
 def plot_ellipse(box_im, ellipse):

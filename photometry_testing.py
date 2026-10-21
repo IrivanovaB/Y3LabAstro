@@ -5,7 +5,7 @@ A module for testing the methods in photometry.
 import numpy as np
 import matplotlib.pyplot as plt
 from images import load_image, fit_pixel_histogram
-from photometry import get_box_image, find_centre, get_local_background, box_in_sky
+from detection_box_gaussian import get_box_image, find_centre, get_local_background
 
 
 # Global variables.
@@ -107,7 +107,7 @@ def detection_ellipse(sample=10000, box_size=[101, 101]):
     plt.hist(std_no, bins=np.arange(0, 5, 0.1), density=True)
     plt.xlabel('Standard deviation')
     plt.tight_layout()
-    plt.savefig('figures/detection_ellipse', dpi=300)
+    # plt.savefig('figures/detection_ellipse', dpi=300)
     plt.show()
 
     std_no_err = np.std(std_no)
