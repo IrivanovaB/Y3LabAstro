@@ -1,0 +1,83 @@
+import numpy as np
+from maths import gaussian_1d
+from classes import Mask 
+
+
+class SourceDetector:
+    '''
+    Detects the sources in an image.
+
+    Args:
+        image (MaskedOriginal): The image.
+    '''
+    def __init__(self, image):
+        self.image = image
+        self.data = self.image.data
+        self.__sources = []
+        return self
+
+    def sources(self):
+        '''
+        Returns:
+            list: A list of the coordinates of the sources.
+        '''
+        return self.__sources
+
+    def source_masks(self):
+        return self.__source_masks__
+
+    def detector(self):
+        '''
+        Identifies the pixel with the highest intensity, stores its
+        coordinates, and masks it.
+
+        NOTE: The threshold for source detection is currently set at
+        one sigma level above the mean.
+        '''
+        #image box_size = (87, 257) #54 boxes up and 10 boxes along -> 540 total boxes 
+        #fml
+
+        def segment_stats(box):
+            return np.mean(box), np.std(box), np.amax(box)
+
+        pix_mean, pix_std, max_pix_val = segment_stats(self.data)
+
+        if max_pix_val < (pix_mean + 1*pix_std):
+            print('There are no more sources.')
+            return
+        
+        max_pix_coord = np.argmax(self.data)
+        self.__sources.append(max_pix_coord)
+
+        object_mask_bol = Mask(np.zeros(self.data.shape()))
+
+        object_mask_bol[max_pix_coord] = 1
+
+        var = True
+        top_corner = max_pix_coord
+        box_size = 3
+        while var:
+            path_start = [top_corner[1]+1, top_corner[0]-1]
+            path_end = [top_corner[1], top_corner[0]-1] 
+            #like snake the game
+
+            path_size = box_size*2 + 2*(box_size-1)
+            path = []
+            #top
+            for i in box_size:
+                path.append()
+
+
+
+"""
+maybe just some jotting: 
+- high values
+- go in a box around it 
+- stop box when variance in perimeter on box is like high or signiciantly lower than the arbitrary threshold
+- two masks: boolean mask (object); normalised mask: reliability (?) 
+- go to the next value taking into account the masks 
+"""
+        
+
+        
+
