@@ -40,62 +40,75 @@ def load_image():
     return image
 
 
-def get_pixel_histogram(im):
+def get_pixel_histogram(im, threshold):
     '''
     Computes the pixel value histogram of the image.
 
     Args:
         im (arr): The image.
+        threshold (list): The lower and upper thresholds of the pixel
+            value.
 
     Returns:
         tuple[arr, arr]: The optimal values and the covariance matrix.
     '''
-    bins = np.arange(np.max(im.compressed())+10., step=bin_width)
+    im = im.compressed()
+    if threshold is not None:
+        im = im[im > threshold[0]]
+        im = im[im < threshold[1]]
+    bins = np.arange(np.max(im)+10., step=bin_width)
     return np.histogram(im, bins=bins)
 
 
-def fit_pixel_histogram(im, p0):
+def fit_pixel_histogram(im, p0, threshold):
     '''
     Fits a Gaussian distribution to the pixel value histogram.
 
     Args:
         im (arr): The image.
         p0 (list): Initial guesses.
+        threshold (list): The lower and upper thresholds of the pixel
+            value.
 
     Returns:
         tuple[arr, arr]: The optimal values and the covariance matrix.
     '''
-    count, bin_edge = get_pixel_histogram(im=im)
+    count, bin_edge = get_pixel_histogram(im=im, threshold=threshold)
     bins = (bin_edge[1:] + bin_edge[:-1]) / 2
     return gaussian_1d_fit(x_data=bins, y_data=count, p0=p0)
 
 
-def plot_pixel_histogram(im, p0=None):
+def plot_pixel_histogram(im, p0=None, threshold=None):
     '''
     Args:
         im (arr): The image.
         p0 (list | None): Initial guesses. If supplied, plots the
             Gaussian fit. Defaults to None.
+        threshold (list | None): The lower and upper thresholds of the pixel
+            value. Defaults to None.
 
     Returns:
         tuple[arr, arr]: If p0 is not None, the optimal values and the
             covariance matrix.
     '''
-    count, bin_edge = get_pixel_histogram(im=im)
+    count, bin_edge = get_pixel_histogram(im=im, threshold=threshold)
     plt.stairs(count, bin_edge, fill=True)
-    plt.xlabel("Pixel Value (a.u.)")
+    plt.xlabel("Pixel value")
     plt.ylabel("Count")
     plt.tight_layout()
     if p0 is not None:
-        popt, pcov = fit_pixel_histogram(im=im, p0=p0)
+        popt, pcov = fit_pixel_histogram(im=im, p0=p0, threshold=threshold)
         bins = (bin_edge[1:] + bin_edge[:-1]) / 2
         plt.plot(bins, gaussian_1d(bins, *popt))
         plt.xlim(popt[1] - 10*popt[2], popt[1] + 10*popt[2])
-        plt.show()
+        plt.xlim(popt[1] - 10*popt[2], popt[1] + 10*popt[2])
         perr = np.sqrt(np.diag(pcov))
         print(f'A = {popt[0]:.2f} +/- {perr[0]:.2f}\n'
               f'μ = {popt[1]:.2f} +/- {perr[1]:.2f}\n'
               f'σ = {popt[2]:.2f} +/- {perr[2]:.2f}')
-        return popt, pcov
-    # plt.savefig("figures/masked image histogram", dpi=300)
+    else:
+        popt = None
+        pcov = None
+    # plt.savefig("figures/global_pixel_value", dpi=300)
     plt.show()
+    return popt, pcov
