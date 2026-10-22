@@ -40,14 +40,14 @@ def load_image():
     return image
 
 
-def get_pixel_histogram(im, threshold):
+def get_pixel_histogram(im, threshold=None):
     '''
     Computes the pixel value histogram of the image.
 
     Args:
         im (arr): The image.
-        threshold (list): The lower and upper thresholds of the pixel
-            value.
+        threshold (list | None): The lower and upper thresholds of the
+            pixel value. Defaults to None.
 
     Returns:
         tuple[arr, arr]: The optimal values and the covariance matrix.
@@ -60,15 +60,15 @@ def get_pixel_histogram(im, threshold):
     return np.histogram(im, bins=bins)
 
 
-def fit_pixel_histogram(im, p0, threshold):
+def fit_pixel_histogram(im, p0, threshold=None):
     '''
     Fits a Gaussian distribution to the pixel value histogram.
 
     Args:
         im (arr): The image.
         p0 (list): Initial guesses.
-        threshold (list): The lower and upper thresholds of the pixel
-            value.
+        threshold (list | None): The lower and upper thresholds of the
+            pixel value. Defaults to None.
 
     Returns:
         tuple[arr, arr]: The optimal values and the covariance matrix.
@@ -84,8 +84,8 @@ def plot_pixel_histogram(im, p0=None, threshold=None):
         im (arr): The image.
         p0 (list | None): Initial guesses. If supplied, plots the
             Gaussian fit. Defaults to None.
-        threshold (list | None): The lower and upper thresholds of the pixel
-            value. Defaults to None.
+        threshold (list | None): The lower and upper thresholds of the
+            pixel value. Defaults to None.
 
     Returns:
         tuple[arr, arr]: If p0 is not None, the optimal values and the
