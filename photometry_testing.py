@@ -5,12 +5,15 @@ A module for testing the methods in photometry.
 import numpy as np
 import matplotlib.pyplot as plt
 from images import load_image, fit_pixel_histogram
-from detection_box_gaussian import get_box_image, find_centre, get_local_background, fit_gaussian, plot_gaussian
+from photometry import (get_box_image, find_centre, get_local_background,
+                        finding_masks, get_ellipse_params)
 
 
 # Global variables.
 image = load_image()
 image_shape = np.shape(image)
+bg_threshold = 11
+global_bg = 3420
 
 
 def generate_random_box(box_size):
@@ -44,10 +47,10 @@ def background_box(sample=10000, box_size=[101, 101]):
     while i < sample:
         try:
             box = generate_random_box(box_size=box_size)
-            im = get_box_image(im=image, box=box)
-            median = np.median(im.compressed())
+            box_im = get_box_image(im=image, box=box)
+            median = np.median(box_im.compressed())
             p0 = [box_area/5, median, 10, 0, 0]
-            popt, _ = fit_pixel_histogram(im=im, p0=p0)
+            popt, _ = fit_pixel_histogram(im=box_im, p0=p0)
             std.append(popt[2])
             z_score.append((median - popt[1]) / popt[2])
             i += 1
@@ -75,57 +78,106 @@ def background_box(sample=10000, box_size=[101, 101]):
     print(f'Box size = {box_size}')
 
 
-def get_ellipse_axes():
+def get_ellipse_axes(im, ellipse):
     '''
     Locates the pixels that lie on the semi-major and semi-minor axes
     of the ellipse.
 
     Args:
+        im (arr): The image.
+        ellipse (arr): The ellipse parameters.
 
     Returns:
-
+        arr: The pixels on the axes of the ellipse.
     '''
+    shape = np.shape(im)
+    centre = ellipse[0]
+    theta = np.pi/180 * ellipse[2]
+    l = np.arange(-200, 200, 0.1)
+    x_axis1 = np.rint(centre[0] + l * np.cos(theta)).astype('int')
+    y_axis1 = np.rint(centre[1] + l * np.sin(theta)).astype('int')
+    x_axis2 = np.rint(centre[0] - l * np.sin(theta)).astype('int')
+    y_axis2 = np.rint(centre[1] + l * np.cos(theta)).astype('int')
+    def within_image(x, y):
+        xy = np.column_stack((x, y))
+        mask = (x >= 0) & (x < shape[1]) & (y >= 0) & (y < shape[0])
+        return xy[mask]
+    axis1 = within_image(x_axis1, y_axis1)
+    axis2 = within_image(x_axis2, y_axis2)
+    return im[axis1[:, 1], axis1[:, 0]], im[axis2[:, 1], axis2[:, 0]]
 
-def detection_ellipse(sample=10, box_size=[101, 101]):
+
+def detection_ellipse(sample=100, box_size=[200, 200]):
     '''
     Computes the number of standard deviations from the centre of the
     source at which the fitted distribution is within one pixel of the
     local background mean.
 
     Args:
-        sample (int): The number of samples. Defaults to 10000.
+        sample (int): The number of samples. Defaults to 100.
         box_size (list): The shape of the box. Defaults to [101, 101].
     '''
     i = 0
-    std_no = []
+    std = []
     while i < sample:
         box = generate_random_box(box_size=box_size)
-        im = get_box_image(im=image, box=box)
-        if len(im.compressed()) == 0:
+        box_im = get_box_image(im=image, box=box)
+        if len(box_im.compressed()) == 0:
             continue
-        max_index = find_centre(im=im)
-        max_value = im[max_index]
+        max_index = find_centre(im=box_im)
+        max_value = box_im[max_index]
         if np.ma.is_masked(max_value) or not np.isfinite(max_value):
             continue
         max_index_shifted = [max_index[0]+box[0][0], max_index[1]+box[0][1]]
-        local_bg = get_local_background(im=image, centre=max_index_shifted)
-        std = np.sqrt(2 * np.log(max_value - local_bg))
-        popt, pcov = fit_gaussian(box_im=im)
-
-        if not np.isfinite(std):
+        try:
+            _, popt, _ = finding_masks(im=image, centre=max_index_shifted)
+        except Exception:
             continue
-        std_no.append(std)
+        popt = popt[0]
+        if popt[0] < bg_threshold:
+            continue
+        ellipse = get_ellipse_params(popt=popt, size=1)
+        std1, std2 = ellipse[1]
+        axis1, axis2 = get_ellipse_axes(im=image, ellipse=ellipse)
+        if (len(axis1) != 4000) or (len(axis2) != 4000):
+            continue
+        local_bg = get_local_background(im=image, centre=max_index_shifted)
+        l = np.arange(-200, 200, 0.1)
+        axis1_mean = np.mean(axis1.reshape(-1, 10), axis=1)
+        axis2_mean = np.mean(axis2.reshape(-1, 10), axis=1)
+        l_mean = np.mean(l.reshape(-1, 10), axis=1)
+        axis1_bg = l_mean[axis1_mean <= local_bg]
+        axis2_bg = l_mean[axis2_mean <= local_bg]
+        axis1_bg = [np.max(axis1_bg[axis1_bg < 0]),
+                    np.min(axis1_bg[axis1_bg > 0])]
+        axis2_bg = [np.max(axis2_bg[axis2_bg < 0]),
+                    np.min(axis2_bg[axis2_bg > 0])]
+        axis1_bg = np.abs(axis1_bg / std1)
+        axis2_bg = np.abs(axis2_bg / std2)
+        std.append([*axis1_bg, *axis2_bg])
+        # plt.plot(l, axis1, '.', ms=1)
+        # plt.plot(l, axis2, '.', ms=1)
+        # plt.xlabel('Distance from source')
+        # plt.ylabel('Pixel value')
+        # # plt.savefig('figures/detection_ellipse_axes_pixel', dpi=300)
+        # plt.show()
         i += 1
+        print(i)
+    std = np.array(std).flatten()
 
-    plt.hist(std_no, bins=np.arange(0, 5, 0.1), density=True)
+    plt.hist(std, bins=np.arange(0, np.max(std)+0.5, 0.5), density=True)
     plt.xlabel('Standard deviation')
     plt.tight_layout()
     # plt.savefig('figures/detection_ellipse', dpi=300)
     plt.show()
 
-    std_no_err = np.std(std_no)
-    std_no_mean = np.mean(std_no)
+    std_10 = (std < 10).sum() / len(std)
+    std_15 = (std < 15).sum() / len(std)
+    std_err = np.std(std)
+    std = np.mean(std)
     print('STATISTICS')
-    print(f'Number of std = {std_no_mean:.4f} +/- {std_no_err:.4f}')
+    print(f'Number of std = {std:.4f} +/- {std_err:.4f}')
+    print(f'P(std < 10) = {std_10:.4f}')
+    print(f'P(std < 15) = {std_15:.4f}')
     print(f'Samples = {sample}')
     print(f'Box size = {box_size}')
