@@ -19,7 +19,7 @@ box_size = 6
 bg_box_size = 50
 bg_threshold = 11
 global_bg = 3420
-ellipse_size = 20
+ellipse_size = 10
 debug = False
 
 
@@ -823,6 +823,7 @@ def finding_masks(im, centre, debug_mode):
 
                 bm = get_binary_mask(im=im, box=box, ellipse=objs, debug_mode=debug_mode)
                 bms.append(bm)
+                local_bg = get_local_background(im=im*(1-bm), centre=centre, debug_mode=debug_mode)
                 # bm = get_box_image(im=bm, box=box)
                 flux = np.sum(im * bm)
                 flux = flux - local_bg * bm.sum()
@@ -878,6 +879,7 @@ def finding_masks(im, centre, debug_mode):
 
                     bm = get_binary_mask(im=im, box=box, ellipse=ellipse, debug_mode=debug_mode)
                     bms.append(bm)
+                    local_bg = get_local_background(im=im*(1-bm), centre=centre, debug_mode=debug_mode)
                     # bm = get_box_image(im=bm, box=box)
                     flux = np.sum(im * bm)
                     flux = flux - local_bg * bm.sum()
@@ -916,7 +918,9 @@ def run_photometry():
     '''
     Runs the photometry.
     '''
-    im = image[2560:4601, 1549:2500]
+    im = image
+    im[im>36000] = 36000
+    #im = image[2560:4601, 1549:2500]
 
     #im = im[950:1010, 620:680]
     # im = image
@@ -954,7 +958,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) == 352: #99
+        if len(fluxes) == 61: #99
             debug = True
 
 

@@ -3,7 +3,7 @@ from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
 
-flux_file = "fluxes.json"
+flux_file = "fourth run.json"
 
 # mosaic = fits.open('Fits_Data/mosaic.fits')
 # header = mosaic[0].header
@@ -17,7 +17,7 @@ flux_file = "fluxes.json"
 # PV2_1   =             1.00E+00 / &                                             
 #  PV2_3   =             3.75E+02 / & 
 
-magzrr = 2.000E-02
+magzrr = 2.530E+01
 gain = 3.1
 exposure_time = 720
 
@@ -36,16 +36,18 @@ fluxes = np.log10(fluxes)
 magnitudes = -2.5 * fluxes
 magnitudes = magzrr - magnitudes 
 
-# plt.plot(fluxes, magnitudes, "x")
-# plt.grid()
-# plt.xlabel("Fluxes (in base 10)")
-# plt.ylabel("Magnitude")
-# plt.title("Magnitude v Flux")
-# plt.show()
+plt.plot(fluxes, magnitudes, "x")
+plt.grid()
+plt.xlabel("Fluxes (in base 10 and corrected)")
+plt.ylabel("Magnitude")
+plt.title("Magnitude v Flux")
+plt.show()
 
 
-counts, bin, __ = plt.hist(magnitudes, cumulative=True)
+counts, bin, __ = plt.hist(magnitudes,  bins=np.arange(20, 40, 1), cumulative=True)
 plt.semilogy()
+plt.xlabel("Magnitudes")
+plt.ylabel("Cumulative Count")
 plt.show()
 
 
