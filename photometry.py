@@ -746,7 +746,7 @@ def finding_masks(im, centre, debug_mode):
     #     print(im[centre[0], centre[1]])
     #     print(np.array([box_im.compressed() > threshold]).sum())
     #     print(np.array([box_im > threshold]).sum())
-    
+
     # if np.array([box_im.compressed() > local_bg]).sum() < 5:
     #     # print([box_im > local_bg])
     #     plt.imshow(box_im)
@@ -846,7 +846,7 @@ def finding_masks(im, centre, debug_mode):
                     mask[centre[0], centre[1]] = 1
                     masked_image = get_new_image(mask=mask, box=box, im=im, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
                     return masked_image, [np.nan], [np.nan]
-                #brute force: basically if fitted peak is not within stddev of actual peak 
+                #brute force: basically if fitted peak is not within stddev of actual peak
                 elif obj[1] > np.abs(peaks[i][0]-obj[3]) or obj[2] > np.abs(peaks[i][1]-obj[4]):
                     obj[1] = peaks[i][0]
                     obj[2] = peaks[i][1]
