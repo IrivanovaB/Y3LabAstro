@@ -533,7 +533,7 @@ def get_new_image(mask, box, im, padded_image, edge_mask, plot=False):
     box_im = get_box_image(im=im, box=box)
     new_image = im
 
-    if (padded_image == None).all():
+    if (padded_image != None).any():
         combined_mask = np.ma.mask_or(mask, edge_mask)
         #masked_image = np.ma.array(padded_image, mask=combined_mask)
 
@@ -763,9 +763,9 @@ def main():
     '''
     im = image[2560:4601, 1549:2500]
 
-    im = im[950:1010, 620:680]
+    #im = im[950:1010, 620:680]
     # im = image
-    # im = im[0:15, 540:590]  #example of an edge object for the segment
+    im = im[0:15, 540:590]  #example of an edge object for the segment
 
     #im = np.transpose(im)
     #im = im[::-1, ::-1]
