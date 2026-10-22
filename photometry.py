@@ -94,10 +94,6 @@ def edge_box(bounds, dx, dy, debug_mode=False):
     h = np.abs(cs[0] - cs[2])
     w = np.abs(cs[1] - cs[3])
 
-    if debug_mode:
-        print("the coords")
-        print(cs)
-
     return cs, h, w
 
 
@@ -115,10 +111,6 @@ def create_box(centre, prev_box, bounds, size=box_size, debug_mode=False):
         list: The coordinates of the top left corner of the box, its
             height, and its width.
     '''
-
-    if debug_mode:
-        print("\n")
-        print(f"previous box: {prev_box}")
 
     if prev_box is None:
         dx = [centre[1] - size, centre[1] + size]
@@ -564,7 +556,7 @@ def get_binary_mask_historic(box_im, ellipse):
     return binary_mask
 
 
-def get_binary_mask(im, box, ellipse, debug_mode):
+def get_binary_mask(im, box, ellipse, debug_mode=False):
     '''
     Computes the binary mask.
 
@@ -583,8 +575,6 @@ def get_binary_mask(im, box, ellipse, debug_mode):
     center[1] += box[0][0]
     center = tuple(center.astype(int))
     axes = tuple(np.round(np.asarray(ellipse[1]) / 2).astype(int))
-
-    
 
     if axes[0] == 0 or axes[1] == 0:
         object_binary_mask[center[1], center[0]] = im[center[1], center[0]]
@@ -616,9 +606,9 @@ def get_new_image(mask, box, im, padded_image, edge_mask, padded, plot=False):
         im (arr): The image.
         plot (bool): If True, plots the image. Defaults to False.
     '''
-    _, _, bc = get_box_coords(box)
+    # _, _, bc = get_box_coords(box)
 
-    box_im = get_box_image(im=im, box=box)
+    # box_im = get_box_image(im=im, box=box)
     new_image = im
 
     if padded:
@@ -717,12 +707,6 @@ def get_local_background(im, centre, debug_mode):
     box = create_box(centre=centre, prev_box=None, bounds=np.shape(im), size=bg_box_size)
     box_im = get_box_image(im=im, box=box)
 
-    if debug_mode:
-        print(box)
-        print(box_im.compressed())
-        plt.imshow(box_im)
-        plt.show()
-
     return np.median(box_im.compressed())
 
 
@@ -769,13 +753,6 @@ def finding_masks(im, centre, debug_mode):
         # threshold is larger than a quarter.
         box = create_box(centre=centre, prev_box=box, bounds=bounds, size=box_size, debug_mode=debug_mode)
         box_im = get_box_image(im=im, box=box)
-
-        if debug_mode:
-            print(box)
-            print(centre, bounds)
-            plt.imshow(box_im)
-            plt.title("growing box")
-            plt.show()
 
         box_im_edge = np.concatenate(
             (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
@@ -857,16 +834,19 @@ def finding_masks(im, centre, debug_mode):
                 objs = objs.reshape(no_of_objs, 9)
 
                 for i, obj in enumerate(objs):
+                    if obj[3] > box[2] or obj[4] > box[1]:
+                        #basically if stddev goes outside the box then the result is unreliable and we mask it as it is unphysical (possibly can denote how often this happens)
+                        mask = np.zeros_like(im)
+                        mask[centre[0], centre[1]] = 1
+                        masked_image = get_new_image(mask=mask, box=box, im=im, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
+                        return masked_image, [np.nan], [np.nan]
                     #brute force: basically if fitted peak is not within stddev of actual peak 
-                    if obj[1] > np.abs(peaks[i][0]-obj[3]) or obj[2] > np.abs(peaks[i][1]-obj[4]):
+                    elif obj[1] > np.abs(peaks[i][0]-obj[3]) or obj[2] > np.abs(peaks[i][1]-obj[4]):
                         obj[1] = peaks[i][0]
                         obj[2] = peaks[i][1]
-                        #then if the stddev goes outside the box (which is unphysical especially in this case)
-                        if obj[3] > box[2] or obj[4] > box[1]:
-                            print(box[2], box[1])
-                            obj[3] = box[2]/ellipse_size
-                            obj[4] = box[1]/ellipse_size
-                            #completely arbitrary and removes lots of information so could just do a catch all instead as this would be seen as an object
+                    
+                        #completely arbitrary and removes lots of information so could just do a catch all instead as this would be seen as an object
+
 
                     ellipse = get_ellipse_params(popt=obj)
 
@@ -898,7 +878,11 @@ def finding_masks(im, centre, debug_mode):
 
         except RuntimeError as exc:
             print(f"Gaussian fit failed: {exc}")
-            raise
+            bm = np.zeros_like(im)
+            bm[centre[0], centre[1]] = 1
+            obj = np.nan
+            flux = np.nan
+            break
         except RuntimeError:
             bm = np.where(box_im > np.median(box_im),
                           np.ones_like(box_im), np.zeros_like(box_im))
@@ -919,7 +903,17 @@ def run_photometry():
     Runs the photometry.
     '''
     im = image
-    im[im>36000] = 36000
+    #im[2975:3020, 1447:1449] = 0
+    stripe_mask = np.zeros_like(im)
+    stripe_mask[2613:, 1447:1449] = 1
+    im = get_new_image(mask=stripe_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
+
+    circle = [[1772, 577], [25, 25], 0]
+    circle_mask = get_binary_mask(im=im, box=[[0, 0], 20, 20], ellipse=circle)
+    #plot_ellipse(im[567:588, 1762:1783], ellipse = circle)
+    im = get_new_image(mask=circle_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
+
+    #im[im>36000] = 36000
     #im = image[2560:4601, 1549:2500]
 
     #im = im[950:1010, 620:680]
@@ -958,7 +952,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) == 61: #99
+        if len(fluxes) == 63: #99
             debug = True
 
 
