@@ -53,8 +53,7 @@ def gaussian_2d(xy, A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C):
     c = (np.sin(theta)**2 / (2*sigma_x**2)
          + np.cos(theta)**2 / (2*sigma_y**2))
     return (
-        A*np.exp(- a*(x-mu_x)**2 - 2*b*(x-mu_x)*(y-mu_y) - c*(y-mu_y)**2)
-        + B_x*x + B_y*y + C
+        A*np.exp(- a*(x-mu_x)**2 - 2*b*(x-mu_x)*(y-mu_y) - c*(y-mu_y)**2) + C
     )
 
 
