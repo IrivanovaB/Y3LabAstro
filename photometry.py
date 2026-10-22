@@ -737,7 +737,7 @@ def finding_masks(im, centre, debug_mode):
     box_im_edge = np.concatenate(
         (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
     )
-    local_bg = get_local_background(im=im, centre=centre, debug_mode=debug_mode)
+    local_bg = get_local_background(im=im, centre=centre)
     threshold = local_bg + 3*bg_threshold
 
     # if debug_mode:
@@ -767,16 +767,13 @@ def finding_masks(im, centre, debug_mode):
             (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
         )
 
-        
         #box_in_sky(im=im, box=box, centre=centre)
         if np.mean(box_im.compressed()) < threshold:
             mask = np.zeros_like(im)
             mask[centre[0], centre[1]] = 1
             masked_image = np.ma.array(im, mask=mask)
             return masked_image, [np.nan], [np.nan]
-            
 
-    
     if debug_mode:
         box_in_sky(im=im, box=box, centre=centre)
 
@@ -868,7 +865,7 @@ def finding_masks(im, centre, debug_mode):
                 bm = get_binary_mask(im=im, box=box, ellipse=ellipse)
                 bms.append(bm)
                 # bm = get_box_image(im=bm, box=box)
-                flux = np.sum(box_im * bm)
+                flux = np.sum(im * bm)
                 flux = flux - local_bg * bm.sum()
                 flux_segment.append(flux)
 
@@ -964,4 +961,4 @@ def run_photometry():
             debug = True
 
 
-# run_photometry()
+run_photometry()
