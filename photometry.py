@@ -19,7 +19,7 @@ box_size = 6
 bg_box_size = 50
 bg_threshold = 11
 global_bg = 3420
-ellipse_size = 10
+ellipse_size = 15
 debug = False
 
 
@@ -313,7 +313,7 @@ def fit_gaussian(box_im):
     Returns:
         tuple[arr, arr]: The optimal values and the covariance matrix.
     '''
-    nx, ny = np.shape(box_im)
+    ny, nx = np.shape(box_im)
     xy = np.meshgrid(range(nx), range(ny))
     p0 = [
         np.max(box_im),
@@ -332,7 +332,7 @@ def plot_gaussian(box_im, popt):
         box_im (arr): The boxed region.
         popt (arr): The fitted values.
     '''
-    nx, ny = np.shape(box_im)
+    ny, nx = np.shape(box_im)
     x, y = np.meshgrid(range(nx), range(ny))
 
     fig = plt.figure()
@@ -389,6 +389,7 @@ def plot_n_gaussian(box_im, popt):
     subfig.plot_surface(x, y, box_im, label="Data")
     subfig.plot_surface(x, y, gaussian_2d_n((x, y), *popt), alpha=0.5, label="Fit")
     subfig.legend()
+    plt.show()
 
 
 def get_residuals(box_im, popt):
@@ -426,12 +427,9 @@ def get_ellipse_params(popt, size=ellipse_size):
     '''
     Converts the fitted values into the ellipse parameters.
 
-    NOTE: The axes are currently set at 10*std.
-
     Args:
         popt (arr): The fitted values.
-        size (int): The number of standard deviations to take as the
-            semi-major and semi-minor axes. Defaults to ellipse_size.
+        size (int): The ellipse size.
 
     Returns:
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
@@ -439,8 +437,9 @@ def get_ellipse_params(popt, size=ellipse_size):
     '''
     net_turn = popt[5]/(2*np.pi) - popt[5]//(2*np.pi)
 
-    # return (popt[2], popt[1]), (10*popt[4], 10*popt[3]), 180-180/np.pi*popt[5]
-    return (popt[2], popt[1]), (size*popt[4], size*popt[3]), 90 - 180*net_turn/(np.pi)
+    return ((popt[2], popt[1]), (size*popt[4], size*popt[3]), 90-180/np.pi*popt[5])
+    # return ((popt[2], popt[1]), (ellipse_size*popt[4], ellipse_size*popt[3]),
+    #         90 - 180*net_turn/(np.pi))
 
 
 def plot_ellipse(box_im, ellipse):
@@ -466,6 +465,34 @@ def plot_ellipse(box_im, ellipse):
     )
     ax.set_aspect("equal")
     plt.show()
+
+
+def shift_ellipse_coord(box, ellipse):
+    '''
+    Shifts the coordinate of the centre of the fitted ellipse from the
+    boxed region to the full image.
+
+    Args:
+        ellipse (list): The parameters of the fitted ellipse.
+        popt (arr): The fitted values.
+    '''
+    ellipse[0][0] += box[0][1]
+    ellipse[0][1] += box[0][0]
+    return ellipse
+
+
+def shift_popt_coord(box, popt):
+    '''
+    Shifts the coordinate of the centre of the fitted Gaussian from the
+    boxed region to the full image.
+
+    Args:
+        box (list): The box information.
+        popt (arr): The fitted values.
+    '''
+    popt[1] += box[0][0]
+    popt[2] += box[0][1]
+    return popt
 
 
 def pad_edge_box(box_im, bounds, source):
@@ -670,29 +697,8 @@ def fit_ellipse(im, threshold): #this function was vibe coded with copilot to be
     return cv2.fitEllipse(contour)
 
 
-def plot_ellipse_edge(im, ellipse):
-    center, diameters, angle = ellipse
-    fig, ax = plt.subplots()
-    ax.imshow(im, cmap="gray")
-    ax.add_patch(
-        Ellipse(
-            xy=center,
-            width=diameters[0],
-            height=diameters[1],
-            angle=angle,
-            fill=False,
-            edgecolor="red",
-        )
-    )
-    ax.set_aspect("equal")
-    plt.show()
-
-
-def get_local_background(im, centre, debug_mode):
+def get_local_background(im, centre):
     '''
-    Computes the threshold on the pixel value at the edge of the box.
-
-    NOTE: The threshold is currently set at the median + 20.
     Computes the local background mean around a source.
 
     Args:
@@ -714,13 +720,16 @@ def finding_masks(im, centre, debug_mode):
     '''
     Masks a source.
 
+    NOTE: The detection threshold currently is set at 3*std of the
+    local background mean.
+
     Args:
         im (arr): The image.
         centre (tuple): The coordinates of the brightest pixel.
 
     Returns:
         tuple[arr, arr, arr]: The masked image, the parameters of the
-            fitted ellipse, and the flux of the source.
+            fitted object, and the flux of the source.
     '''
     bounds = np.shape(im)
     box = create_box(centre=centre, prev_box=None, bounds=bounds)
@@ -729,7 +738,7 @@ def finding_masks(im, centre, debug_mode):
         (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
     )
     local_bg = get_local_background(im=im, centre=centre, debug_mode=debug_mode)
-    threshold = local_bg + bg_threshold
+    threshold = local_bg + 3*bg_threshold
 
     # if debug_mode:
     #     print("HERE")
@@ -784,118 +793,117 @@ def finding_masks(im, centre, debug_mode):
     bms = []
     flux_segment = []
     objs = []
+    objs_shifted = []
 
-    while True:
-        try:
-            if box[1] != box[2]:
-                box_im_unpadded = box_im
-                box_im, edge_mask = pad_edge_box(box_im=box_im, bounds=bounds, source=centre)
-                padded_image = box_im
-                padded = True
+    try:
+        if box[1] != box[2]:
+            box_im, edge_mask = pad_edge_box(box_im=box_im, bounds=bounds, source=centre)
+            padded_image = box_im
+            padded = True
 
-                box_im = np.ma.array(box_im, mask=edge_mask)
+            box_im = np.ma.array(box_im, mask=edge_mask)
 
-                objs = fit_ellipse(box_im, np.median(box_im))
-                #plot_ellipse_edge(box_im, objs)
+            obj = fit_ellipse(box_im, np.median(box_im))
+            plot_ellipse(box_im=box_im, ellipse=obj)
 
-                bm = get_binary_mask(im=im, box=box, ellipse=objs, debug_mode=debug_mode)
-                bms.append(bm)
-                local_bg = get_local_background(im=im*(1-bm), centre=centre, debug_mode=debug_mode)
-                # bm = get_box_image(im=bm, box=box)
-                flux = np.sum(im * bm)
-                flux = flux - local_bg * bm.sum()
-                flux_segment.append(flux)
-            else:
-                peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*np.max(box_im))
+            obj_shifted = shift_ellipse_coord(box=box, ellipse=obj)
+            objs_shifted.append()
 
-                if len(peaks) == 0:
-                    #peaks = [[centre[1], centre[0]]]
-                    peaks_i = np.unravel_index(np.argmax(box_im), np.shape(box_im))
-                    peaks = [[peaks_i[1], peaks_i[0]]]
+            bm = get_binary_mask(im=im, box=box, ellipse=objs)
+            bms.append(bm)
+            # bm = get_box_image(im=bm, box=box)
+            flux = np.sum(im * bm)
+            flux = flux - local_bg * bm.sum()
+            flux_segment.append(flux)
+        else:
+            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=threshold)
 
-                objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks, debug_mode=debug_mode)
+            if len(peaks) == 0:
+                #peaks = [[centre[1], centre[0]]]
+                peaks_i = np.unravel_index(np.argmax(box_im), np.shape(box_im))
+                peaks = [[peaks_i[1], peaks_i[0]]]
+
+            objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks, debug_mode=debug_mode)
+
+            if debug_mode:
+                print(f"fitted object: {objs}")
+                plot_n_gaussian(box_im=box_im, popt=objs)
+                plt.show()
+
+            # obj = fit_gaussian(box_im=box_im)
+            # plot_gaussian(box_im=box_im, popt=obj[0])
+
+            #residuals, chi_sq = get_residuals(box_im=box_im, popt=objs)
+            #plot_residuals(residuals, chi_sq)
+            #plt.show()
+
+            #need to discuss methods
+            no_of_objs = len(objs)//9
+
+            objs = objs.reshape(no_of_objs, 9)
+
+            for i, obj in enumerate(objs):
+                if obj[3] > box[2] or obj[4] > box[1]:
+                    #basically if stddev goes outside the box then the result is unreliable and we mask it as it is unphysical (possibly can denote how often this happens)
+                    mask = np.zeros_like(im)
+                    mask[centre[0], centre[1]] = 1
+                    masked_image = get_new_image(mask=mask, box=box, im=im, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
+                    return masked_image, [np.nan], [np.nan]
+                #brute force: basically if fitted peak is not within stddev of actual peak 
+                elif obj[1] > np.abs(peaks[i][0]-obj[3]) or obj[2] > np.abs(peaks[i][1]-obj[4]):
+                    obj[1] = peaks[i][0]
+                    obj[2] = peaks[i][1]
+
+                    #completely arbitrary and removes lots of information so could just do a catch all instead as this would be seen as an object
+
+
+                ellipse = get_ellipse_params(popt=obj)
 
                 if debug_mode:
-                    print(f"fitted object: {objs}")
-                    plot_n_gaussian(box_im=box_im, popt=objs)
-                    plt.show()
+                    plot_ellipse(box_im=box_im, ellipse=ellipse)
 
-                # obj = fit_gaussian(box_im=box_im)
-                # plot_gaussian(box_im=box_im, popt=obj[0])
+                obj_shifted = shift_popt_coord(box=box, popt=obj)
+                objs_shifted.append(obj_shifted)
 
+                bm = get_binary_mask(im=im, box=box, ellipse=ellipse)
+                bms.append(bm)
+                # bm = get_box_image(im=bm, box=box)
+                flux = np.sum(box_im * bm)
+                flux = flux - local_bg * bm.sum()
+                flux_segment.append(flux)
 
-                #residuals, chi_sq = get_residuals(box_im=box_im, popt=objs)
-                #plot_residuals(residuals, chi_sq)
-                #plt.show()
+        # ellipse = get_ellipse_params(popt=objs)
+        # plot_ellipse(box_im=box_im, ellipse=ellipse)
 
-                #need to discuss methods
-                no_of_objs = len(objs)//9
-
-                objs = objs.reshape(no_of_objs, 9)
-
-                for i, obj in enumerate(objs):
-                    if obj[3] > box[2] or obj[4] > box[1]:
-                        #basically if stddev goes outside the box then the result is unreliable and we mask it as it is unphysical (possibly can denote how often this happens)
-                        mask = np.zeros_like(im)
-                        mask[centre[0], centre[1]] = 1
-                        masked_image = get_new_image(mask=mask, box=box, im=im, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
-                        return masked_image, [np.nan], [np.nan]
-                    #brute force: basically if fitted peak is not within stddev of actual peak 
-                    elif obj[1] > np.abs(peaks[i][0]-obj[3]) or obj[2] > np.abs(peaks[i][1]-obj[4]):
-                        obj[1] = peaks[i][0]
-                        obj[2] = peaks[i][1]
-                    
-                        #completely arbitrary and removes lots of information so could just do a catch all instead as this would be seen as an object
+        # bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
+        # flux = np.sum(box_im * bm)
+        # bm_r = 1 - bm
+        # bg_flux = np.mean(box_im * bm_r)
+        # flux = flux - bg_flux * bm.sum()
 
 
-                    ellipse = get_ellipse_params(popt=obj)
+    except RuntimeError as exc:
+        print(f"Gaussian fit failed: {exc}")
+        bm = np.zeros_like(im)
+        bm[centre[0], centre[1]] = 1
+        obj = np.nan
+        flux = np.nan
+    except RuntimeError:
+        bm = np.where(box_im > np.median(box_im),
+                        np.ones_like(box_im), np.zeros_like(box_im))
+        obj = np.nan
+        flux = np.nan
 
-                    if debug_mode:
-                        plot_ellipse(box_im=box_im, ellipse=ellipse)
 
-                    if ellipse[1][0] < 6 or ellipse[1][1] < 6:
-                        #bc tuples are immutable
-                        ellipse = ((peaks[i][1], peaks[i][0]), (6, 6), ellipse[2])
-
-                    bm = get_binary_mask(im=im, box=box, ellipse=ellipse, debug_mode=debug_mode)
-                    bms.append(bm)
-                    local_bg = get_local_background(im=im*(1-bm), centre=centre, debug_mode=debug_mode)
-                    # bm = get_box_image(im=bm, box=box)
-                    flux = np.sum(im * bm)
-                    flux = flux - local_bg * bm.sum()
-                    flux_segment.append(flux)
-
-            # ellipse = get_ellipse_params(popt=objs)
-            # plot_ellipse(box_im=box_im, ellipse=ellipse)
-
-            # bm = get_binary_mask(box_im=box_im, ellipse=ellipse)
-            # flux = np.sum(box_im * bm)
-            # bm_r = 1 - bm
-            # bg_flux = np.mean(box_im * bm_r)
-            # flux = flux - bg_flux * bm.sum()
-
-            break
-
-        except RuntimeError as exc:
-            print(f"Gaussian fit failed: {exc}")
-            bm = np.zeros_like(im)
-            bm[centre[0], centre[1]] = 1
-            obj = np.nan
-            flux = np.nan
-            break
-        except RuntimeError:
-            bm = np.where(box_im > np.median(box_im),
-                          np.ones_like(box_im), np.zeros_like(box_im))
-            obj = np.nan
-            flux = np.nan
-            break
-
-    masked_image = im 
+    masked_image = im
     for bm_mask in bms:
         #masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
-        masked_image = get_new_image(mask=bm_mask, box=box, im=masked_image, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
+        masked_image = get_new_image(
+            mask=bm_mask, box=box, im=masked_image, padded_image=padded_image,
+            edge_mask=edge_mask, padded=padded
+        )
 
-    return masked_image, objs, flux_segment
+    return masked_image, objs_shifted, flux_segment
 
 
 def run_photometry():
@@ -956,4 +964,4 @@ def run_photometry():
             debug = True
 
 
-run_photometry()
+# run_photometry()
