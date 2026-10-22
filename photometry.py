@@ -367,8 +367,8 @@ def fit_n_gaussian(box_im, peaks, debug_mode):
 
     #Trying to resolve the error of curve fit returning []. 
 
-    if debug_mode:
-        print(f"parameters: {ps}")
+    # if debug_mode:
+    #     print(f"parameters: {ps}")
 
     ps = np.array(ps, dtype=float)
     ps = ps.flatten()
@@ -584,11 +584,11 @@ def get_binary_mask(im, box, ellipse, debug_mode=False):
                 color=(255, 0, 0), thickness=-1
             )
 
-    if debug_mode: 
-        print("Ellipse being plotted")
-        print(center, axes, ellipse[2])
-        plt.imshow(object_binary_mask)
-        plt.show()
+    # if debug_mode: 
+    #     print("Ellipse being plotted")
+    #     print(center, axes, ellipse[2])
+    #     plt.imshow(object_binary_mask)
+    #     plt.show()
 
     binary_mask = object_binary_mask/np.max(object_binary_mask)
     return binary_mask
@@ -751,8 +751,30 @@ def finding_masks(im, centre, debug_mode):
     while (box_im_edge > threshold).sum() > (len(box_im_edge) / 2):
         # i.e. If the number of pixels on the edge that are above the
         # threshold is larger than a quarter.
+        
+        
         box = create_box(centre=centre, prev_box=box, bounds=bounds, size=box_size, debug_mode=debug_mode)
         box_im = get_box_image(im=im, box=box)
+
+        # #get all column indices which are fully masked
+        # masked_cols_i = np.flatnonzero(box_im.mask.all(axis=0))
+        # if len(masked_cols_i) > 0:
+        #     min_i = np.min(masked_cols_i)
+        #     max_i = np.max(masked_cols_i)
+        #     masked_x = box[0][1] + min_i
+        #     if centre[1] < masked_x: #if source is to the left of the masked columns 
+        #         bounds = (bounds[0], masked_x)
+        #     else: #if source is to the right of the masked columns 
+        #         bounds = (bounds[0], centre[1] - box[2] + max_i)
+
+        if debug_mode:
+            print(masked_cols_i)
+            print(f"bounds: {bounds}")
+            print(f"centre: {centre}")
+            print(f"width {box[2]}")
+            plt.imshow(box_im)
+            plt.title("box of objects")
+            plt.show()
 
         box_im_edge = np.concatenate(
             (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
@@ -815,10 +837,10 @@ def finding_masks(im, centre, debug_mode):
 
                 objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks, debug_mode=debug_mode)
 
-                if debug_mode:
-                    print(f"fitted object: {objs}")
-                    plot_n_gaussian(box_im=box_im, popt=objs)
-                    plt.show()
+                # if debug_mode:
+                #     print(f"fitted object: {objs}")
+                #     plot_n_gaussian(box_im=box_im, popt=objs)
+                #     plt.show()
 
                 # obj = fit_gaussian(box_im=box_im)
                 # plot_gaussian(box_im=box_im, popt=obj[0])
@@ -850,8 +872,8 @@ def finding_masks(im, centre, debug_mode):
 
                     ellipse = get_ellipse_params(popt=obj)
 
-                    if debug_mode:
-                        plot_ellipse(box_im=box_im, ellipse=ellipse)
+                    # if debug_mode:
+                    #     plot_ellipse(box_im=box_im, ellipse=ellipse)
 
                     if ellipse[1][0] < 6 or ellipse[1][1] < 6:
                         #bc tuples are immutable
@@ -861,6 +883,7 @@ def finding_masks(im, centre, debug_mode):
                     bms.append(bm)
                     local_bg = get_local_background(im=im*(1-bm), centre=centre, debug_mode=debug_mode)
                     # bm = get_box_image(im=bm, box=box)
+
                     flux = np.sum(im * bm)
                     flux = flux - local_bg * bm.sum()
                     flux_segment.append(flux)
@@ -880,6 +903,7 @@ def finding_masks(im, centre, debug_mode):
             print(f"Gaussian fit failed: {exc}")
             bm = np.zeros_like(im)
             bm[centre[0], centre[1]] = 1
+        
             obj = np.nan
             flux = np.nan
             break
@@ -894,6 +918,10 @@ def finding_masks(im, centre, debug_mode):
     for bm_mask in bms:
         #masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
         masked_image = get_new_image(mask=bm_mask, box=box, im=masked_image, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
+
+    if debug_mode:
+        print("result")
+        box_in_sky(im=masked_image, box=box, centre=centre)
 
     return masked_image, objs, flux_segment
 
@@ -952,7 +980,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) == 63: #99
+        if len(fluxes) == 8: #99
             debug = True
 
 
