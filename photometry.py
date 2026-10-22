@@ -19,7 +19,7 @@ box_size = 6
 bg_box_size = 50
 bg_threshold = 11
 global_bg = 3420
-ellipse_size = 10
+ellipse_size = 15
 
 
 # Note that all of the following are in (y, x) instead of (x, y).
@@ -397,7 +397,7 @@ def plot_residuals(res, chi_sq):
     # plt.imshow(res)
 
 
-def get_ellipse_params(popt):
+def get_ellipse_params(popt, size=ellipse_size):
     '''
     Converts the fitted values into the ellipse parameters.
 
@@ -405,6 +405,7 @@ def get_ellipse_params(popt):
 
     Args:
         popt (arr): The fitted values.
+        size (int): The ellipse size.
 
     Returns:
         tuple[arr, arr, float]: The centre, the axes, and the clockwise
@@ -412,8 +413,7 @@ def get_ellipse_params(popt):
     '''
     net_turn = popt[5]/(2*np.pi) - popt[5]//(2*np.pi)
 
-    return ((popt[2], popt[1]), (ellipse_size*popt[4], ellipse_size*popt[3]),
-            90-180/np.pi*popt[5])
+    return ((popt[2], popt[1]), (size*popt[4], size*popt[3]), 90-180/np.pi*popt[5])
     # return ((popt[2], popt[1]), (ellipse_size*popt[4], ellipse_size*popt[3]),
     #         90 - 180*net_turn/(np.pi))
 
@@ -443,7 +443,21 @@ def plot_ellipse(box_im, ellipse):
     plt.show()
 
 
-def popt_coord_shift(box, popt):
+def shift_ellipse_coord(box, ellipse):
+    '''
+    Shifts the coordinate of the centre of the fitted ellipse from the
+    boxed region to the full image.
+
+    Args:
+        ellipse (list): The parameters of the fitted ellipse.
+        popt (arr): The fitted values.
+    '''
+    ellipse[0][0] += box[0][1]
+    ellipse[0][1] += box[0][0]
+    return ellipse
+
+
+def shift_popt_coord(box, popt):
     '''
     Shifts the coordinate of the centre of the fitted Gaussian from the
     boxed region to the full image.
@@ -712,6 +726,7 @@ def finding_masks(im, centre):
     bms = []
     flux_segment = []
     objs = []
+    objs_shifted = []
 
     try:
         if box[1] != box[2]:
@@ -720,8 +735,11 @@ def finding_masks(im, centre):
 
             box_im = np.ma.array(box_im, mask=edge_mask)
 
-            objs = fit_ellipse(box_im, np.median(box_im))
-            #plot_ellipse_edge(box_im, objs)
+            obj = fit_ellipse(box_im, np.median(box_im))
+            plot_ellipse(box_im=box_im, ellipse=obj)
+
+            obj_shifted = shift_ellipse_coord(box=box, ellipse=obj)
+            objs_shifted.append()
 
             bm = get_binary_mask(im=im, box=box, ellipse=objs)
             bms.append(bm)
@@ -730,7 +748,7 @@ def finding_masks(im, centre):
             flux = flux - local_bg * bm.sum()
             flux_segment.append(flux)
         else:
-            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*np.median(box_im))
+            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=threshold)
 
             if len(peaks) == 0:
                 peaks = [[centre[1], centre[0]]]
@@ -742,7 +760,6 @@ def finding_masks(im, centre):
             # obj = fit_gaussian(box_im=box_im)
             # plot_gaussian(box_im=box_im, popt=obj[0])
 
-
             #residuals, chi_sq = get_residuals(box_im=box_im, popt=objs)
             #plot_residuals(residuals, chi_sq)
             #plt.show()
@@ -751,13 +768,12 @@ def finding_masks(im, centre):
             no_of_objs = len(objs)//9
 
             objs = objs.reshape(no_of_objs, 9)
-            objs_shifted = []
 
             for obj in objs:
                 ellipse = get_ellipse_params(popt=obj)
                 plot_ellipse(box_im=box_im, ellipse=ellipse)
 
-                obj_shifted = popt_coord_shift(box=box, popt=obj)
+                obj_shifted = shift_popt_coord(box=box, popt=obj)
                 objs_shifted.append(obj_shifted)
 
                 bm = get_binary_mask(im=im, box=box, ellipse=ellipse)
@@ -766,7 +782,7 @@ def finding_masks(im, centre):
                 flux = np.sum(box_im * bm)
                 flux = flux - local_bg * bm.sum()
                 flux_segment.append(flux)
-                plot_n_gaussian(box_im=box_im, popt=obj)
+                # plot_n_gaussian(box_im=box_im, popt=obj)
 
         # ellipse = get_ellipse_params(popt=objs)
         # plot_ellipse(box_im=box_im, ellipse=ellipse)
@@ -787,17 +803,17 @@ def finding_masks(im, centre):
         obj = np.nan
         flux = np.nan
 
-    print("objects")
-    print(objs)
+    # print("objects")
+    # print(objs)
 
     masked_image = im
     for bm_mask in bms:
         #masked_image = get_new_image(xi=xi, yi=yi, mask=bm, box=box, im=im)
         masked_image = get_new_image(mask=bm_mask, box=box, im=masked_image, padded_image=box_im, edge_mask=edge_mask)
-        plt.imshow(masked_image)
-        plt.show()
+        # plt.imshow(masked_image)
+        # plt.show()
 
-    return masked_image, obj_shifted, flux_segment
+    return masked_image, objs_shifted, flux_segment
 
 
 def run_photometry():

@@ -5,7 +5,8 @@ A module for testing the methods in photometry.
 import numpy as np
 import matplotlib.pyplot as plt
 from images import load_image, fit_pixel_histogram
-from photometry import get_box_image, find_centre, get_local_background, finding_masks, get_ellipse_params, plot_ellipse
+from photometry import (get_box_image, find_centre, get_local_background,
+                        finding_masks, get_ellipse_params)
 
 
 # Global variables.
@@ -106,25 +107,18 @@ def get_ellipse_axes(im, ellipse):
     return im[axis1[:, 1], axis1[:, 0]], im[axis2[:, 1], axis2[:, 0]]
 
 
-# im = load_image()
-# ellipse =[[400, 600], [200, 100], 50]
-# axis1, axis2 = get_ellipse_axes(im, ellipse)
-# plt.plot(axis1[:,0], axis1[:,1])
-# plt.plot(axis2[:,0], axis2[:,1])
-
-
-def detection_ellipse(sample=10, box_size=[200, 200]):
+def detection_ellipse(sample=100, box_size=[200, 200]):
     '''
     Computes the number of standard deviations from the centre of the
     source at which the fitted distribution is within one pixel of the
     local background mean.
 
     Args:
-        sample (int): The number of samples. Defaults to 10000.
+        sample (int): The number of samples. Defaults to 100.
         box_size (list): The shape of the box. Defaults to [101, 101].
     '''
     i = 0
-    std_no = []
+    std = []
     while i < sample:
         box = generate_random_box(box_size=box_size)
         box_im = get_box_image(im=image, box=box)
@@ -139,31 +133,51 @@ def detection_ellipse(sample=10, box_size=[200, 200]):
             _, popt, _ = finding_masks(im=image, centre=max_index_shifted)
         except Exception:
             continue
+        popt = popt[0]
         if popt[0] < bg_threshold:
             continue
-        ellipse = get_ellipse_params(popt=popt)
+        ellipse = get_ellipse_params(popt=popt, size=1)
         std1, std2 = ellipse[1]
         axis1, axis2 = get_ellipse_axes(im=image, ellipse=ellipse)
         if (len(axis1) != 4000) or (len(axis2) != 4000):
             continue
+        local_bg = get_local_background(im=image, centre=max_index_shifted)
         l = np.arange(-200, 200, 0.1)
-        plt.plot(l, axis1, '.', ms=1)
-        plt.plot(l, axis2, '.', ms=1)
-        plt.xlabel('Distance from source')
-        plt.ylabel('Pixel value')
-        # plt.savefig('figures/ellipse_axes_pixel', dpi=300)
-        plt.show()
+        axis1_mean = np.mean(axis1.reshape(-1, 10), axis=1)
+        axis2_mean = np.mean(axis2.reshape(-1, 10), axis=1)
+        l_mean = np.mean(l.reshape(-1, 10), axis=1)
+        axis1_bg = l_mean[axis1_mean <= local_bg]
+        axis2_bg = l_mean[axis2_mean <= local_bg]
+        axis1_bg = [np.max(axis1_bg[axis1_bg < 0]),
+                    np.min(axis1_bg[axis1_bg > 0])]
+        axis2_bg = [np.max(axis2_bg[axis2_bg < 0]),
+                    np.min(axis2_bg[axis2_bg > 0])]
+        axis1_bg = np.abs(axis1_bg / std1)
+        axis2_bg = np.abs(axis2_bg / std2)
+        std.append([*axis1_bg, *axis2_bg])
+        # plt.plot(l, axis1, '.', ms=1)
+        # plt.plot(l, axis2, '.', ms=1)
+        # plt.xlabel('Distance from source')
+        # plt.ylabel('Pixel value')
+        # # plt.savefig('figures/detection_ellipse_axes_pixel', dpi=300)
+        # plt.show()
         i += 1
+        print(i)
+    std = np.array(std).flatten()
 
-    plt.hist(std_no, bins=np.arange(0, 5, 0.1), density=True)
+    plt.hist(std, bins=np.arange(0, np.max(std)+0.5, 0.5), density=True)
     plt.xlabel('Standard deviation')
     plt.tight_layout()
     # plt.savefig('figures/detection_ellipse', dpi=300)
     plt.show()
 
-    std_no_err = np.std(std_no)
-    std_no_mean = np.mean(std_no)
+    std_10 = (std < 10).sum() / len(std)
+    std_15 = (std < 15).sum() / len(std)
+    std_err = np.std(std)
+    std = np.mean(std)
     print('STATISTICS')
-    print(f'Number of std = {std_no_mean:.4f} +/- {std_no_err:.4f}')
+    print(f'Number of std = {std:.4f} +/- {std_err:.4f}')
+    print(f'P(std < 10) = {std_10:.4f}')
+    print(f'P(std < 15) = {std_15:.4f}')
     print(f'Samples = {sample}')
     print(f'Box size = {box_size}')
