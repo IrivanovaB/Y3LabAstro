@@ -1,10 +1,16 @@
+'''
+A module for the galaxy number count.
+'''
+
 import json
 from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import optimize
 
-flux_file = "fluxes.json"
-flux_err_file = "fluxes_err.json"
+
+flux_file = "data runs/fluxes.json"
+flux_err_file = "data runs/fluxes_err.json"
 
 # mosaic = fits.open('Fits_Data/mosaic.fits')
 # header = mosaic[0].header
@@ -23,6 +29,7 @@ magerr = 2.000E-02
 gain = 3.1
 exposure_time = 720
 normalisation = 0.0564
+normalisation = 1
 
 
 with open(flux_file, "r") as file:
@@ -70,20 +77,28 @@ counts_err = np.sqrt(counts)
 plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
-plt.ylabel("N (per deg\u00b2 per 0.5 mag)")
-# plt.savefig('figures/normalised_count_plot', dpi=300)
+plt.ylabel("N")
+# plt.ylabel("N (per deg\u00b2 per 0.5 mag)")
+# plt.savefig('figures/count_plot', dpi=300)
 plt.show()
 
 counts = counts.cumsum()
 counts_err = np.sqrt(counts)
-plt.errorbar(bins, counts, yerr=counts_err, fmt='x', ms=0.5)
+
+def log_line(x, m, c):
+    return 10**(x*m + c)
+
+popt, pcov = optimize.curve_fit(
+    log_line, xdata=bins[2:12], ydata=counts[2:12], sigma=counts_err[2:12]
+)
+
+plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
+plt.plot(bins[2:12], log_line(bins[2:12], *popt))
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
-plt.ylabel("Cumulative N (per deg\u00b2 per 0.5 mag)")
-# plt.savefig('figures/normalised_cumulative_count_plot', dpi=300)
+plt.ylabel("Cumulative N")
+# plt.ylabel("Cumulative N (per deg\u00b2 per 0.5 mag)")
+# plt.savefig('figures/cumulative_count_plot', dpi=300)
 plt.show()
 
-
-def line(x, m, c):
-    y = x*m
-    return y + c
+print(f'slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
