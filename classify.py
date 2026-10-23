@@ -22,6 +22,7 @@ magzpt = 2.530E+01
 magerr = 2.000E-02
 gain = 3.1
 exposure_time = 720
+normalisation = 0.0564
 
 
 with open(flux_file, "r") as file:
@@ -62,21 +63,24 @@ plt.show()
 
 bins = np.arange(np.min(magnitudes)-0.5, np.max(magnitudes)+0.5, 0.5)
 counts, bins = np.histogram(magnitudes, bins=bins)
-
+counts_err = np.sqrt(counts) / normalisation
+counts = counts / normalisation
 bins = (bins[1:] + bins[:-1]) / 2
-
-plt.errorbar(bins, counts, yerr=np.sqrt(counts), fmt='x')
+counts_err = np.sqrt(counts)
+plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
-plt.ylabel("N")
-# plt.savefig('figures/count_plot', dpi=300)
+plt.ylabel("N (per deg\u00b2 per 0.5 mag)")
+# plt.savefig('figures/normalised_count_plot', dpi=300)
 plt.show()
 
-plt.errorbar(bins, counts.cumsum(), yerr=np.sqrt(counts.cumsum()), fmt='x')
+counts = counts.cumsum()
+counts_err = np.sqrt(counts)
+plt.errorbar(bins, counts, yerr=counts_err, fmt='x', ms=0.5)
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
-plt.ylabel("Cumulative N")
-# plt.savefig('figures/cumulative_count_plot', dpi=300)
+plt.ylabel("Cumulative N (per deg\u00b2 per 0.5 mag)")
+# plt.savefig('figures/normalised_cumulative_count_plot', dpi=300)
 plt.show()
 
 
