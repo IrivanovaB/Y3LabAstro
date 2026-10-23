@@ -443,7 +443,7 @@ def plot_ellipse(box_im, ellipse):
     '''
     center, diameters, angle = ellipse
     fig, ax = plt.subplots()
-    ax.imshow(box_im, cmap="gray")
+    ax.imshow(box_im, cmap="viridis")
     ax.add_patch(
         Ellipse(
             xy=center,
@@ -672,7 +672,7 @@ def fit_ellipse(im, threshold): #this function was vibe coded with copilot to be
     Returns ``((center_x, center_y), (diameter_1, diameter_2), angle_degrees)``,
     with coordinates relative to ``im``.
     """
-    im = np.asarray(im)
+    #im = np.asarray(im)
 
     mask = np.ascontiguousarray(
         (np.isfinite(im) & (im >= threshold)).astype(np.uint8)
@@ -810,8 +810,9 @@ def finding_masks(im, centre, debug_mode):
 
             box_im = np.ma.array(box_im, mask=edge_mask)
 
-            obj = fit_ellipse(box_im, np.median(box_im))
-            #plot_ellipse(box_im=box_im, ellipse=obj)
+            obj = fit_ellipse(box_im, np.ma.median(box_im))
+            if debug_mode:
+                plot_ellipse(box_im=box_im, ellipse=obj)
 
 
             ellipse_list = [[obj[0][0], obj[0][1]], [obj[1][0], obj[1][1]], obj[2]]
@@ -1006,7 +1007,7 @@ def run_photometry():
     centre = find_centre(im=im)
 
     plt.imshow(im)
-    plt.title("Original segment")
+    plt.title("Masked Original Image")
     plt.show()
 
     objects = []
@@ -1017,6 +1018,9 @@ def run_photometry():
 
     debug = False
 
+    data_dict = {}
+
+    obj_no = 1
     while centre is not None:
         im, objs, f, f_err = finding_masks(im=im, centre=centre, debug_mode=debug)
 
@@ -1041,7 +1045,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) == 723: #99
+        if len(fluxes) >= 50: #99
             debug = True
         else:
             debug = False
