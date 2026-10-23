@@ -20,6 +20,7 @@ bg_box_size = 50
 bg_threshold = 11
 global_bg = 3420
 ellipse_size = 15
+saturation = 36000
 debug = False
 
 
@@ -722,6 +723,7 @@ def finding_masks(im, centre, debug_mode):
         tuple[arr, arr, arr]: The masked image, the parameters of the
             fitted object, and the flux of the source.
     '''
+    centre_pixel = im[centre]
     shape = np.shape(im)
     bounds = [0, 0, shape[0], shape[1]] #basically [min y, min x, max y, max x]
     box = create_box(centre=centre, prev_box=None, bounds=bounds)
@@ -780,7 +782,7 @@ def finding_masks(im, centre, debug_mode):
             mask = np.zeros_like(im)
             mask[centre[0], centre[1]] = 1
             masked_image = np.ma.array(im, mask=mask)
-            return masked_image, [np.nan], [np.nan]
+            return masked_image, [np.nan], [np.nan], [np.nan]
 
     if debug_mode:
         box_in_sky(im=im, box=box, centre=centre)
@@ -797,6 +799,7 @@ def finding_masks(im, centre, debug_mode):
 
     bms = []
     flux_segment = []
+    flux_segment_err = []
     objs = []
     objs_shifted = []
 
@@ -826,10 +829,13 @@ def finding_masks(im, centre, debug_mode):
             # bm = get_box_image(im=bm, box=box)
             image_mask = np.ma.getmask(im)
             masked_bm = np.ma.array(bm, mask=image_mask)
-            
+
+            area = np.ma.sum(masked_bm)
             flux = np.ma.sum(im * bm)
-            flux = flux - local_bg * np.ma.sum(masked_bm)
+            flux_err = np.sqrt(flux - area * bg_threshold**2)
+            flux = flux - local_bg * area
             flux_segment.append(flux)
+            flux_segment_err.append(flux_err)
         else:
             if debug_mode:
                 print(f"threshold {threshold}")
@@ -893,9 +899,12 @@ def finding_masks(im, centre, debug_mode):
                 image_mask = np.ma.getmask(im)
                 masked_bm = np.ma.array(bm, mask=image_mask)
 
+                area = np.ma.sum(masked_bm)
                 flux = np.ma.sum(im * bm)
-                flux = flux - local_bg * np.ma.sum(masked_bm)
+                flux_err = np.sqrt(flux - area * bg_threshold**2)
+                flux = flux - local_bg * area
                 flux_segment.append(flux)
+                flux_segment_err.append(flux_err)
 
         # ellipse = get_ellipse_params(popt=objs)
         # plot_ellipse(box_im=box_im, ellipse=ellipse)
@@ -918,12 +927,13 @@ def finding_masks(im, centre, debug_mode):
         )
         obj = [np.nan]
         flux = [np.nan]
-        return masked_image, obj, flux
-    except RuntimeError:
-        bm = np.where(box_im > np.median(box_im),
-                        np.ones_like(box_im), np.zeros_like(box_im))
-        obj = np.nan
-        flux = np.nan
+        flux_err = [np.nan]
+        return masked_image, obj, flux, flux_err
+    # except RuntimeError:
+    #     bm = np.where(box_im > np.median(box_im),
+    #                     np.ones_like(box_im), np.zeros_like(box_im))
+    #     obj = np.nan
+    #     flux = np.nan
 
 
     masked_image = im
@@ -934,7 +944,12 @@ def finding_masks(im, centre, debug_mode):
             edge_mask=edge_mask, padded=padded
         )
 
-    return masked_image, objs_shifted, flux_segment
+    if centre_pixel > saturation:
+        objs_shifted = [np.nan]
+        flux_segment = [np.nan]
+        flux_segment_err = [np.nan]
+
+    return masked_image, objs_shifted, flux_segment, flux_segment_err
 
 
 def run_photometry():
@@ -947,33 +962,33 @@ def run_photometry():
     stripe_mask[2613:, 1447:1449] = 1
     im = get_new_image(mask=stripe_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
-    #incomplete mask 
+    #incomplete mask
     circle = [[1772, 577], [25, 25], 0]
     circle_mask = get_binary_mask(im=im, box=[[0, 0], 20, 20], ellipse=circle)
     #plot_ellipse(im[567:588, 1762:1783], ellipse = circle)
     im = get_new_image(mask=circle_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
-    #incomplete mask 
+    #incomplete mask
     circle_2 = [[1690, 36], [30, 30], 0]
     circle_2_mask = get_binary_mask(im=im, box=[[0,0], 30, 30], ellipse=circle_2)
     im = get_new_image(mask=circle_2_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
-    #incomplete mask 
+    #incomplete mask
     circle_3 = [[1365, 4331], [20, 20], 0]
     circle_3_mask = get_binary_mask(im=im, box=[[0,0], 20, 20], ellipse=circle_3)
     im = get_new_image(mask=circle_3_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
-    #incomplete mask 
+    #incomplete mask
     circle_4 = [[1312, 4400], [30, 30], 0]
     circle_4_mask = get_binary_mask(im=im, box=[[0,0], 30, 30], ellipse=circle_4)
     im = get_new_image(mask=circle_4_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
-    #this is a corrupted object on the bottom - basically it has a mask over it by the time i have detected it but there are a bunch of 0 squares around it and inside it and also a lot of bright spots surrounding it 
+    #this is a corrupted object on the bottom - basically it has a mask over it by the time i have detected it but there are a bunch of 0 squares around it and inside it and also a lot of bright spots surrounding it
     circle_5 = [[1339, 4587], [20, 20], 0]
     circle_5_mask = get_binary_mask(im=im, box=[[0,0], 20, 20], ellipse=circle_5)
     im = get_new_image(mask=circle_5_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
-    #two pixels at the bottom 
+    #two pixels at the bottom
     bottom = np.zeros_like(im)
     bottom[4607:4608, 690:692] = 1
     im = get_new_image(mask=bottom, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
@@ -996,22 +1011,31 @@ def run_photometry():
 
     objects = []
     fluxes = []
+    fluxes_err = []
     # with open("fluxes.json", "w") as flux_file:
     #     json.dump(fluxes, flux_file)
 
     debug = False
 
     while centre is not None:
-        im, objs, f = finding_masks(im=im, centre=centre, debug_mode=debug)
+        im, objs, f, f_err = finding_masks(im=im, centre=centre, debug_mode=debug)
 
         for obj in objs:
             objects.append(obj)
         for flux in f:
             fluxes.append(flux)
 
+        for flux_err in f_err:
+            fluxes_err.append(flux_err)
+
         with open("fluxes.json", "w") as flux_file:
             json.dump([float(value) for value in fluxes], flux_file)
             flux_file.close()
+
+        with open("fluxes_err.json", "w") as flux_err_file:
+            json.dump([float(value) for value in fluxes_err], flux_err_file)
+            flux_err_file.close()
+
         centre = find_centre(im=im)
         # plt.imshow(segment)
         # plt.title("Edge object removed from segment")
