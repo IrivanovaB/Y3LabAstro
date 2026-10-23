@@ -3,7 +3,7 @@ from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
 
-flux_file = "fluxes.json"
+flux_file = "first non negative fluxes.json"
 
 # mosaic = fits.open('Fits_Data/mosaic.fits')
 # header = mosaic[0].header
@@ -34,7 +34,7 @@ fluxes = fluxes*gain/exposure_time
 
 fluxes = np.log10(fluxes)
 magnitudes = -2.5 * fluxes
-magnitudes = magzrr - magnitudes 
+magnitudes = magzrr + magnitudes 
 
 plt.plot(fluxes, magnitudes, "x")
 plt.grid()

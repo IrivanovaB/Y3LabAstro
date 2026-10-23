@@ -51,11 +51,11 @@ def edge_box(bounds, dx, dy, debug_mode=False):
     For a box which is partially outside the image.
 
     Args:
-        bounds (list): The shape of the image.
+        bounds [min y, min x, max y, max x]
         dx (list): [x2, x1], where x2 < x1. x2 is restricted by the
-            boundary x=0, and x1 the boundary bounds[1].
+            boundary bounds[1], and x1 the boundary bounds[3].
         dy (list): [y2, y1], where y2 < y1. y2 is restricted by the
-            boundary y=0, and y1 the boundary bounds[0].
+            boundary bounds[0], and y1 the boundary bounds[2].
 
     Returns:
         list: The updated coordinates of the box, its height, and its
@@ -64,26 +64,26 @@ def edge_box(bounds, dx, dy, debug_mode=False):
     cs = [0, 0, 0, 0] # [y2, x2, y1, x1].
 
     # If y2 goes beyond the top of the image.
-    if dy[0] < 0:
-        cs[0] = 0
+    if dy[0] < bounds[0]:
+        cs[0] = bounds[0]
     else:
         cs[0] = dy[0]
 
     # If y1 goes beyond the bottom of the image.
-    if dy[1] > bounds[0]:
-        cs[2] = bounds[0]
+    if dy[1] > bounds[2]:
+        cs[2] = bounds[2]
     else:
         cs[2] = dy[1]
 
     # If x1 goes beyond the right of the image.
-    if dx[1] > bounds[1]:
-        cs[3] = bounds[1]
+    if dx[1] > bounds[3]:
+        cs[3] = bounds[3]
     else:
         cs[3] = dx[1]
 
     # If x2 goes beyond the left of the image.
-    if dx[0] < 0:
-        cs[1] = 0
+    if dx[0] < bounds[1]:
+        cs[1] = bounds[1]
     else:
         cs[1] = dx[0]
 
@@ -105,7 +105,7 @@ def create_box(centre, prev_box, bounds, size=box_size, debug_mode=False):
         centre (tuple): The coordinates of the centre of the box.
         prev_box (list | None): The information of the previous box. If
             None, no previous boxes exist.
-        bounds (list): The shape of the image.
+        bounds [min y, min x, max y, max x]
 
     Returns:
         list: The coordinates of the top left corner of the box, its
@@ -115,8 +115,8 @@ def create_box(centre, prev_box, bounds, size=box_size, debug_mode=False):
     if prev_box is None:
         dx = [centre[1] - size, centre[1] + size]
         dy = [centre[0] - size, centre[0] + size]
-        if ((dx[0] < 0) or (dx[1] > bounds[1])
-            or (dy[0] < 0) or (dy[1] > bounds[0])):
+        if ((dx[0] < bounds[1]) or (dx[1] > bounds[3])
+            or (dy[0] < bounds[0]) or (dy[1] > bounds[2])):
             # (dx[0]<0) means that to the bottom of the centre it goes
             # beyond the image.
             # (dx[1]>bounds[1]) this means that to the top of the
@@ -134,16 +134,6 @@ def create_box(centre, prev_box, bounds, size=box_size, debug_mode=False):
                 2*size + 1, 2*size + 1]
 
     h, w = prev_box[1], prev_box[2]
-    # if h!= w: # i.e. Working with a box on the edge.
-    #     c = [prev_box[0][0], prev_box[0][1]] # The corner.
-
-    #     # Left, right. Increase by w because corner in top left.
-    #     dx = [c[1] - size, c[1] + w + size]
-    #     # Down, up. Decrase by h because corner in top left.
-    #     dy = [c[0] - size, c[0] + h + size]
-
-    #     cs, h, w = edge_box(bounds=bounds, dx=dx, dy=dy, debug_mode=debug_mode)
-    #     return [[cs[0], cs[1]], h, w]
 
     c = [prev_box[0][0], prev_box[0][1]]
     # Left, right. Increase by w because corner in top left.
@@ -151,7 +141,7 @@ def create_box(centre, prev_box, bounds, size=box_size, debug_mode=False):
     # Down, up. Decrase by h because corner in top left.
     dy = [c[0] - size, c[0] + h + size]
 
-    if (dx[0] < 0) or (dy[0] < 0) or (dx[1] > bounds[1]) or (dy[0] > bounds[0]):
+    if (dx[0] < bounds[1]) or (dy[0] < bounds[0]) or (dx[1] > bounds[3]) or (dy[0] > bounds[2]):
         cs, h, w = edge_box(bounds=bounds, dx=dx, dy=dy, debug_mode=debug_mode)
         return [[cs[0], cs[1]], h, w]
 
@@ -354,7 +344,7 @@ def fit_n_gaussian(box_im, peaks, debug_mode):
     ps = []
     for peak in peaks:
         #A, mu_x, mu_y, sigma_x, sigma_y, theta, B_x, B_y, C
-        A = box_im[peak[1], peak[0]]
+        A = box_im[peak[0], peak[1]]
 
         sigma_x, sigma_y = 0, 0
 
@@ -367,8 +357,8 @@ def fit_n_gaussian(box_im, peaks, debug_mode):
 
     #Trying to resolve the error of curve fit returning []. 
 
-    # if debug_mode:
-    #     print(f"parameters: {ps}")
+    if debug_mode:
+        print(f"parameters: {ps}")
 
     ps = np.array(ps, dtype=float)
     ps = ps.flatten()
@@ -523,7 +513,7 @@ def pad_edge_box(box_im, bounds, source):
         # i.e. the width is greater than the height and so had trouble expanding the height 
         padded_im = np.zeros((half_shape[0]*2, half_shape[1]))
         mask = np.ones((half_shape[0]*2, half_shape[1]))
-        if np.abs(source[0] - bounds[0]) > source[0]: #more up than down
+        if np.abs(source[0] - bounds[0]) <= bounds[2] - 1 - source[0]: #more up than down
             #on the top
             padded_im[midpoint_y:, :] = box_im
             padded_im[:midpoint_y, :] = fill
@@ -539,7 +529,7 @@ def pad_edge_box(box_im, bounds, source):
         # So expanding horizontally
         padded_im = np.zeros((half_shape[0], half_shape[1]*2))
         mask = np.ones((half_shape[0], half_shape[1]*2))
-        if np.abs(source[1]-bounds[1]) > source[1]: #more left than right
+        if np.abs(source[1]-bounds[1]) <= bounds[3] - 1 - source[1]: #more left than right
             # box_im[midpoint_y:, :] = rb
             # box_im[:midpoint_y, :] = fill
             # mask[midpoint_y:, :] = 1
@@ -611,11 +601,11 @@ def get_binary_mask(im, box, ellipse, debug_mode=False):
                 color=(255, 0, 0), thickness=-1
             )
 
-    # if debug_mode: 
-    #     print("Ellipse being plotted")
-    #     print(center, axes, ellipse[2])
-    #     plt.imshow(object_binary_mask)
-    #     plt.show()
+    if debug_mode: 
+        print("Ellipse being plotted")
+        print(center, axes, ellipse[2])
+        plt.imshow(object_binary_mask)
+        plt.show()
 
     binary_mask = object_binary_mask/np.max(object_binary_mask)
     return binary_mask
@@ -665,12 +655,12 @@ def get_new_image(mask, box, im, padded_image, edge_mask, padded, plot=False):
     # plt.imshow(new_image)
     # plt.show()
 
-    if plot:
-        plt.imshow(new_image)
-        plt.xlim(rb[0], rb[1])
-        plt.ylim(rb[2], rb[3])
-        plt.title("Area Removed by Mask")
-        plt.show()
+    # if plot:
+    #     plt.imshow(new_image)
+    #     plt.xlim(rb[0], rb[1])
+    #     plt.ylim(rb[2], rb[3])
+    #     plt.title("Area Removed by Mask")
+    #     plt.show()
 
     return new_image
 
@@ -710,7 +700,8 @@ def get_local_background(im, centre):
     '''
     # box = [[centre[0] - bg_box_size, centre[1] - bg_box_size],
     #        2*bg_box_size + 1, 2*bg_box_size + 1]
-    box = create_box(centre=centre, prev_box=None, bounds=np.shape(im), size=bg_box_size)
+    shape = np.shape(im)
+    box = create_box(centre=centre, prev_box=None, bounds=[0, 0, shape[0], shape[1]], size=bg_box_size)
     box_im = get_box_image(im=im, box=box)
 
     return np.median(box_im.compressed())
@@ -731,13 +722,14 @@ def finding_masks(im, centre, debug_mode):
         tuple[arr, arr, arr]: The masked image, the parameters of the
             fitted object, and the flux of the source.
     '''
-    bounds = np.shape(im)
+    shape = np.shape(im)
+    bounds = [0, 0, shape[0], shape[1]] #basically [min y, min x, max y, max x]
     box = create_box(centre=centre, prev_box=None, bounds=bounds)
     box_im = get_box_image(im=im, box=box)
     box_im_edge = np.concatenate(
         (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
     )
-    local_bg = get_local_background(im=im, centre=centre, debug_mode=debug_mode)
+    local_bg = get_local_background(im=im, centre=centre)
     threshold = local_bg + 3*bg_threshold
 
     # if debug_mode:
@@ -757,33 +749,27 @@ def finding_masks(im, centre, debug_mode):
     #     masked_image = np.ma.array(im, mask=mask)
     #     return masked_image, [np.nan], [np.nan]
     box_growth = 0
+
+    masked_cols_i = np.flatnonzero(box_im.mask.all(axis=0))
+    if len(masked_cols_i) > 0:
+        min_i = np.min(masked_cols_i)
+        max_i = np.max(masked_cols_i)
+        min_masked_x = box[0][1] + min_i
+        max_masked_x = box[0][1] + max_i
+        if centre[1] < min_masked_x: #if source is to the left of the masked columns 
+            bounds = (bounds[0], bounds[1], bounds[2], min_masked_x)
+        else: #if source is to the right of the masked columns 
+            bounds = (bounds[0], max_masked_x+1, bounds[2], bounds[3])
+
+    if debug_mode:
+        box = create_box(centre=centre, prev_box=box, bounds=bounds, size=box_size, debug_mode=debug_mode)
+        box_in_sky(im=im, box=box, centre=centre)
+
     while (box_im_edge > threshold).sum() > (len(box_im_edge) / 2):
         # i.e. If the number of pixels on the edge that are above the
         # threshold is larger than a quarter.
-        
-        
         box = create_box(centre=centre, prev_box=box, bounds=bounds, size=box_size, debug_mode=debug_mode)
         box_im = get_box_image(im=im, box=box)
-
-        # #get all column indices which are fully masked
-        # masked_cols_i = np.flatnonzero(box_im.mask.all(axis=0))
-        # if len(masked_cols_i) > 0:
-        #     min_i = np.min(masked_cols_i)
-        #     max_i = np.max(masked_cols_i)
-        #     masked_x = box[0][1] + min_i
-        #     if centre[1] < masked_x: #if source is to the left of the masked columns 
-        #         bounds = (bounds[0], masked_x)
-        #     else: #if source is to the right of the masked columns 
-        #         bounds = (bounds[0], centre[1] - box[2] + max_i)
-
-        if debug_mode:
-            print(masked_cols_i)
-            print(f"bounds: {bounds}")
-            print(f"centre: {centre}")
-            print(f"width {box[2]}")
-            plt.imshow(box_im)
-            plt.title("box of objects")
-            plt.show()
 
         box_im_edge = np.concatenate(
             (box_im[:, 0], box_im[:, -1], box_im[0, 1:-1], box_im[-1, 1:-1])
@@ -820,37 +806,53 @@ def finding_masks(im, centre, debug_mode):
     try:
         if box[1] != box[2]:
             box_im, edge_mask = pad_edge_box(box_im=box_im, bounds=bounds, source=centre)
-            padded_image = box_im
             padded = True
 
             box_im = np.ma.array(box_im, mask=edge_mask)
 
             obj = fit_ellipse(box_im, np.median(box_im))
-            plot_ellipse(box_im=box_im, ellipse=obj)
+            #plot_ellipse(box_im=box_im, ellipse=obj)
 
-            obj_shifted = shift_ellipse_coord(box=box, ellipse=obj)
-            objs_shifted.append()
 
-            bm = get_binary_mask(im=im, box=box, ellipse=objs)
+            ellipse_list = [[obj[0][0], obj[0][1]], [obj[1][0], obj[1][1]], obj[2]]
+            obj_shifted = shift_ellipse_coord(box=box, ellipse=ellipse_list)
+            objs_shifted.append(obj_shifted)
+
+            if debug_mode:
+                print(f"obj {obj}")
+                plt.imshow(box_im)
+                plt.show()
+
+
+            bm = get_binary_mask(im=im, box=box, ellipse=obj)
             bms.append(bm)
             # bm = get_box_image(im=bm, box=box)
-            flux = np.sum(im * bm)
-            flux = flux - local_bg * bm.sum()
+            image_mask = np.ma.getmask(im)
+            masked_bm = np.ma.array(bm, mask=image_mask)
+            
+            flux = np.ma.sum(im * bm)
+            flux = flux - local_bg * np.ma.sum(masked_bm)
             flux_segment.append(flux)
         else:
-            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=threshold)
+            if debug_mode:
+                print(f"threshold {threshold}")
+            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*threshold)
 
             if len(peaks) == 0:
                 #peaks = [[centre[1], centre[0]]]
                 peaks_i = np.unravel_index(np.argmax(box_im), np.shape(box_im))
-                peaks = [[peaks_i[1], peaks_i[0]]]
+                peaks = [[peaks_i[0], peaks_i[1]]]
+
+            if debug_mode:
+                print(peaks)
 
             objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks, debug_mode=debug_mode)
 
-                # if debug_mode:
-                #     print(f"fitted object: {objs}")
-                #     plot_n_gaussian(box_im=box_im, popt=objs)
-                #     plt.show()
+            if debug_mode:
+                print(peaks)
+                print(f"fitted object: {objs}")
+                plot_n_gaussian(box_im=box_im, popt=objs)
+                plt.show()
 
             # obj = fit_gaussian(box_im=box_im)
             # plot_gaussian(box_im=box_im, popt=obj[0])
@@ -881,8 +883,6 @@ def finding_masks(im, centre, debug_mode):
 
                 ellipse = get_ellipse_params(popt=obj)
 
-                    # if debug_mode:
-                    #     plot_ellipse(box_im=box_im, ellipse=ellipse)
                 if debug_mode:
                     plot_ellipse(box_im=box_im, ellipse=ellipse)
 
@@ -891,9 +891,13 @@ def finding_masks(im, centre, debug_mode):
 
                 bm = get_binary_mask(im=im, box=box, ellipse=ellipse)
                 bms.append(bm)
+
                 # bm = get_box_image(im=bm, box=box)
-                flux = np.sum(box_im * bm)
-                flux = flux - local_bg * bm.sum()
+                image_mask = np.ma.getmask(im)
+                masked_bm = np.ma.array(bm, mask=image_mask)
+
+                flux = np.ma.sum(im * bm)
+                flux = flux - local_bg * np.ma.sum(masked_bm)
                 flux_segment.append(flux)
 
         # ellipse = get_ellipse_params(popt=objs)
@@ -906,20 +910,24 @@ def finding_masks(im, centre, debug_mode):
         # flux = flux - bg_flux * bm.sum()
 
 
-        except RuntimeError as exc:
-            print(f"Gaussian fit failed: {exc}")
-            bm = np.zeros_like(im)
-            bm[centre[0], centre[1]] = 1
-        
-            obj = np.nan
-            flux = np.nan
-            break
-        except RuntimeError:
-            bm = np.where(box_im > np.median(box_im),
-                          np.ones_like(box_im), np.zeros_like(box_im))
-            obj = np.nan
-            flux = np.nan
-            break
+    except RuntimeError as exc:
+        print(f"Gaussian fit failed: {exc}")
+        bm = np.zeros_like(im)
+        bm[centre[0], centre[1]] = 1
+        masked_image = im
+        masked_image = get_new_image(
+            mask=bm, box=box, im=masked_image, padded_image=padded_image,
+            edge_mask=edge_mask, padded=padded
+        )
+        obj = [np.nan]
+        flux = [np.nan]
+        return masked_image, obj, flux
+    except RuntimeError:
+        bm = np.where(box_im > np.median(box_im),
+                        np.ones_like(box_im), np.zeros_like(box_im))
+        obj = np.nan
+        flux = np.nan
+
 
     masked_image = im
     for bm_mask in bms:
@@ -928,10 +936,6 @@ def finding_masks(im, centre, debug_mode):
             mask=bm_mask, box=box, im=masked_image, padded_image=padded_image,
             edge_mask=edge_mask, padded=padded
         )
-
-    if debug_mode:
-        print("result")
-        box_in_sky(im=masked_image, box=box, centre=centre)
 
     return masked_image, objs_shifted, flux_segment
 
@@ -946,10 +950,36 @@ def run_photometry():
     stripe_mask[2613:, 1447:1449] = 1
     im = get_new_image(mask=stripe_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
+    #incomplete mask 
     circle = [[1772, 577], [25, 25], 0]
     circle_mask = get_binary_mask(im=im, box=[[0, 0], 20, 20], ellipse=circle)
     #plot_ellipse(im[567:588, 1762:1783], ellipse = circle)
     im = get_new_image(mask=circle_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
+
+    #incomplete mask 
+    circle_2 = [[1690, 36], [30, 30], 0]
+    circle_2_mask = get_binary_mask(im=im, box=[[0,0], 30, 30], ellipse=circle_2)
+    im = get_new_image(mask=circle_2_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
+
+    #incomplete mask 
+    circle_3 = [[1365, 4331], [20, 20], 0]
+    circle_3_mask = get_binary_mask(im=im, box=[[0,0], 20, 20], ellipse=circle_3)
+    im = get_new_image(mask=circle_3_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
+
+    #incomplete mask 
+    circle_4 = [[1312, 4400], [30, 30], 0]
+    circle_4_mask = get_binary_mask(im=im, box=[[0,0], 30, 30], ellipse=circle_4)
+    im = get_new_image(mask=circle_4_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
+
+    #this is a corrupted object on the bottom - basically it has a mask over it by the time i have detected it but there are a bunch of 0 squares around it and inside it and also a lot of bright spots surrounding it 
+    circle_5 = [[1339, 4587], [20, 20], 0]
+    circle_5_mask = get_binary_mask(im=im, box=[[0,0], 20, 20], ellipse=circle_5)
+    im = get_new_image(mask=circle_5_mask, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
+
+    #two pixels at the bottom 
+    bottom = np.zeros_like(im)
+    bottom[4607:4608, 690:692] = 1
+    im = get_new_image(mask=bottom, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
     #im[im>36000] = 36000
     #im = image[2560:4601, 1549:2500]
@@ -990,8 +1020,10 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) == 8: #99
+        if len(fluxes) == 723: #99
             debug = True
+        else:
+            debug = False
 
 
-# run_photometry()
+run_photometry()
