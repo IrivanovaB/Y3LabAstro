@@ -3,7 +3,7 @@ from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
 
-flux_file = "first non negative fluxes.json"
+flux_file = "fluxes.json"
 
 # mosaic = fits.open('Fits_Data/mosaic.fits')
 # header = mosaic[0].header
