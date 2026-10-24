@@ -7,10 +7,11 @@ from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize
+from scipy.stats import cumfreq
 
 
-flux_file = "data runs/fluxes.json"
-flux_err_file = "data runs/fluxes_err.json"
+flux_file = "fluxes.json"
+flux_err_file = "fluxes_err.json"
 
 # mosaic = fits.open('Fits_Data/mosaic.fits')
 # header = mosaic[0].header
@@ -29,7 +30,7 @@ magerr = 2.000E-02
 gain = 3.1
 exposure_time = 720
 normalisation = 0.0564
-normalisation = 1
+#normalisation = 1
 
 
 with open(flux_file, "r") as file:
@@ -61,7 +62,8 @@ magnitudes = magzpt - 2.5 * np.log10(fluxes)
 # plt.title("Magnitude v Flux")
 # plt.show()
 
-plt.plot(magnitudes, magnitudes_err, 'x')
+plt.plot(magnitudes, magnitudes_err, 'ko')
+plt.grid()
 plt.xlabel('Apparent magnitude')
 plt.ylabel('Uncertainty')
 plt.ylim((-0.1, 1.5))
@@ -70,6 +72,8 @@ plt.show()
 
 bins = np.arange(np.min(magnitudes)-0.5, np.max(magnitudes)+0.5, 0.5)
 counts, bins = np.histogram(magnitudes, bins=bins)
+# #counts, bins = cumfreq(magnitudes, numbins=len(bins))
+# counts = np.cumsum(counts)
 counts_err = np.sqrt(counts) / normalisation
 counts = counts / normalisation
 bins = (bins[1:] + bins[:-1]) / 2
@@ -82,7 +86,7 @@ plt.ylabel("N")
 # plt.savefig('figures/count_plot', dpi=300)
 plt.show()
 
-counts = counts.cumsum()
+#counts = counts.cumsum()
 counts_err = np.sqrt(counts)
 
 def log_line(x, m, c):
@@ -92,13 +96,16 @@ popt, pcov = optimize.curve_fit(
     log_line, xdata=bins[2:12], ydata=counts[2:12], sigma=counts_err[2:12]
 )
 
+print(f'slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
+
 plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
 plt.plot(bins[2:12], log_line(bins[2:12], *popt))
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
 plt.ylabel("Cumulative N")
+plt.grid()
 # plt.ylabel("Cumulative N (per deg\u00b2 per 0.5 mag)")
 # plt.savefig('figures/cumulative_count_plot', dpi=300)
 plt.show()
 
-print(f'slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
+
