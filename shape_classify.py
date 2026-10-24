@@ -10,16 +10,23 @@ with open(shape_file) as file:
     file.close()
 
 ratios = []
+ratios_err = []
 
 for x in shapes:
-    if isinstance(x, float):
-        ratios.append(0)
-    elif len(x) == 6:
-        ratios.append(x[2]/x[3])
+    if isinstance(x, float): #i.e nan
+        ratios.append(np.nan)
+        ratios_err.append(np.nan)
+    elif len(x) == 6: #we will be discarding the edge cases 
+        #ratios.append(x[2]/x[3]) #in theory this is the ratio
+        ratios.append(np.nan)
+        ratios_err.append(np.nan)
     elif len(x) == 9:
-        ratios.append(x[3]/x[4])
+        ratios.append(x[4]/x[3])
+        #std dev in 
+
     else:
         ratios.append(0)
+        ratios_err.append(0)
 
 with open(flux_file) as file:
     fluxes = json.load(file)
