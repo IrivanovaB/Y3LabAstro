@@ -57,10 +57,11 @@ def background_box(sample=10000, box_size=[101, 101]):
         except Exception:
             continue
 
-    plt.hist(z_score, bins=np.arange(-0.5, 0.51, 0.01), density=True)
-    plt.xlabel('z-score')
+    plt.hist(z_score, bins=np.arange(-0.5, 0.51, 0.01))
+    plt.xlabel('Median offset (σ)')
+    plt.ylabel('Count (per 0.01σ)')
     plt.tight_layout()
-    # plt.savefig('figures/background_box_median_z_score', dpi=300)
+    # plt.savefig('figures/local_background_median_offset', dpi=300)
     plt.show()
 
     std_err = np.std(std)
@@ -68,12 +69,13 @@ def background_box(sample=10000, box_size=[101, 101]):
     z_score = np.abs(np.array(z_score))
     z_score_01 = (z_score < 0.1).sum() / sample
     z_score_10 = (z_score < 1.).sum() / sample
-    z_score = np.mean(z_score)
+    z_score_01_err = np.sqrt(z_score_01*(1-z_score_01) / sample)
+    z_score_10_err = np.sqrt(z_score_10*(1-z_score_10) / sample)
+
     print('STATISTICS')
-    print(f'std of local background mean = {std:.4f} +/- {std_err:.4f}')
-    print(f'z-score of median = {z_score:.4f}')
-    print(f'P(z-score < 0.1) = {z_score_01:.4f}')
-    print(f'P(z-score < 1.0) = {z_score_10:.4f}')
+    print(f'Local background fluctuation = {std:.4f} +/- {std_err:.4f}')
+    print(f'P(median offset < 0.1σ) = {z_score_01:.4f} +/- {z_score_01_err:.4f}')
+    print(f'P(median offset < 1.0σ) = {z_score_10:.4f} +/- {z_score_10_err:.4f}')
     print(f'Samples = {sample}')
     print(f'Box size = {box_size}')
 
@@ -162,22 +164,25 @@ def detection_ellipse(sample=100, box_size=[200, 200]):
         # # plt.savefig('figures/detection_ellipse_axes_pixel', dpi=300)
         # plt.show()
         i += 1
-        print(i)
     std = np.array(std).flatten()
 
-    plt.hist(std, bins=np.arange(0, np.max(std)+0.5, 0.5), density=True)
-    plt.xlabel('Standard deviation')
+    plt.hist(std, bins=np.arange(0, np.max(std)+0.5, 0.5))
+    plt.xlabel('Source size (σ)')
+    plt.ylabel('Count (per 0.5σ)')
     plt.tight_layout()
-    # plt.savefig('figures/detection_ellipse', dpi=300)
+    # plt.savefig('figures/source_size', dpi=300)
     plt.show()
 
     std_10 = (std < 10).sum() / len(std)
     std_15 = (std < 15).sum() / len(std)
+    std_10_err = np.sqrt(std_10*(1-std_10) / sample)
+    std_15_err = np.sqrt(std_15*(1-std_15) / sample)
     std_err = np.std(std)
     std = np.mean(std)
+
     print('STATISTICS')
-    print(f'Number of std = {std:.4f} +/- {std_err:.4f}')
-    print(f'P(std < 10) = {std_10:.4f}')
-    print(f'P(std < 15) = {std_15:.4f}')
+    print(f'Source size = {std:.4f} +/- {std_err:.4f} σ')
+    print(f'P(size < 10σ) = {std_10:.4f} +/- {std_10_err:.4f}')
+    print(f'P(size < 15σ) = {std_15:.4f} +/- {std_15_err:.4f}')
     print(f'Samples = {sample}')
     print(f'Box size = {box_size}')

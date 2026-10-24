@@ -93,8 +93,8 @@ def plot_pixel_histogram(im, p0=None, threshold=None):
     '''
     count, bin_edge = get_pixel_histogram(im=im, threshold=threshold)
     plt.stairs(count, bin_edge, fill=True)
-    plt.xlabel("Pixel value")
-    plt.ylabel("Count")
+    plt.xlabel("Pixel value (ADU)")
+    plt.ylabel("Count (per 5 ADU)")
     plt.tight_layout()
     if p0 is not None:
         popt, pcov = fit_pixel_histogram(im=im, p0=p0, threshold=threshold)
@@ -109,6 +109,6 @@ def plot_pixel_histogram(im, p0=None, threshold=None):
     else:
         popt = None
         pcov = None
-    # plt.savefig("figures/global_pixel_value", dpi=300)
+    # plt.savefig("figures/pixel_value_histogram", dpi=300)
     plt.show()
     return popt, pcov
