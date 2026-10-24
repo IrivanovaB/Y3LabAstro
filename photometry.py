@@ -708,7 +708,7 @@ def get_local_background(im, centre):
     return np.median(box_im.compressed())
 
 
-def finding_masks(im, centre, debug_mode):
+def finding_masks(im, centre, debug_mode, original_im):
     '''
     Masks a source.
 
@@ -904,8 +904,29 @@ def finding_masks(im, centre, debug_mode):
                 flux_err = 0
 
                 if ellipse_area > area:
-                    flux = np.nan
-                    flux_err = np.nan
+                    # #if ignoring these alternatively
+                    # flux = np.nan
+                    # flux_err = np.nan
+
+                    image_mask = np.ma.getmask(original_im)
+
+                    clipped_section = np.ma.array(bm, mask=image_mask)
+
+                    clipped_area = np.ma.sum(clipped_section)
+
+                    if ellipse_area > clipped_area:
+                        flux = np.nan
+                        flux_err = np.nan
+                    else:
+                        #only ellipse left
+                        #select_ellipse = np.ma.array(im, mask=clipped_section)
+                        select_ellipse = bm*original_im
+
+                        flux = np.ma.sum(select_ellipse)
+                        area = np.sum(bm) 
+
+                        flux_err = np.sqrt(flux - area * bg_threshold**2)
+                        flux = flux - local_bg * area
                 else:
                     flux = np.ma.sum(im * bm)
                     flux_err = np.sqrt(flux - area * bg_threshold**2)
@@ -1001,6 +1022,8 @@ def run_photometry():
     bottom[4607:4608, 690:692] = 1
     im = get_new_image(mask=bottom, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
+    original_im = im
+
     #im[im>36000] = 36000
     #im = image[2560:4601, 1549:2500]
 
@@ -1025,8 +1048,10 @@ def run_photometry():
 
     debug = False
 
+    data = {}
+
     while centre is not None:
-        im, objs, f, f_err = finding_masks(im=im, centre=centre, debug_mode=debug)
+        im, objs, f, f_err = finding_masks(im=im, centre=centre, original_im=original_im, debug_mode=debug)
 
         for obj in objs:
             objects.append(obj)
@@ -1049,7 +1074,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) == 700: #99
+        if len(fluxes) >= 750: #99
             debug = True
         else:
             debug = False
