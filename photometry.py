@@ -672,7 +672,7 @@ def fit_ellipse(im, threshold): #this function was vibe coded with copilot to be
     Returns ``((center_x, center_y), (diameter_1, diameter_2), angle_degrees)``,
     with coordinates relative to ``im``.
     """
-    #im = np.asarray(im)
+    im = np.asarray(im)
 
     mask = np.ascontiguousarray(
         (np.isfinite(im) & (im >= threshold)).astype(np.uint8)
@@ -769,7 +769,7 @@ def finding_masks(im, centre, debug_mode):
 
     while (box_im_edge > threshold).sum() > (len(box_im_edge) / 2):
         # i.e. If the number of pixels on the edge that are above the
-        # threshold is larger than a quarter.
+        # threshold is larger than a half.
         box = create_box(centre=centre, prev_box=box, bounds=bounds, size=box_size, debug_mode=debug_mode)
         box_im = get_box_image(im=im, box=box)
 
@@ -810,9 +810,8 @@ def finding_masks(im, centre, debug_mode):
 
             box_im = np.ma.array(box_im, mask=edge_mask)
 
-            obj = fit_ellipse(box_im, np.ma.median(box_im))
-            if debug_mode:
-                plot_ellipse(box_im=box_im, ellipse=obj)
+            obj = fit_ellipse(box_im, np.median(box_im))
+            #plot_ellipse(box_im=box_im, ellipse=obj)
 
 
             ellipse_list = [[obj[0][0], obj[0][1]], [obj[1][0], obj[1][1]], obj[2]]
@@ -846,9 +845,6 @@ def finding_masks(im, centre, debug_mode):
                 #peaks = [[centre[1], centre[0]]]
                 peaks_i = np.unravel_index(np.argmax(box_im), np.shape(box_im))
                 peaks = [[peaks_i[0], peaks_i[1]]]
-
-            if debug_mode:
-                print(peaks)
 
             objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks, debug_mode=debug_mode)
 
@@ -896,14 +892,25 @@ def finding_masks(im, centre, debug_mode):
                 bm = get_binary_mask(im=im, box=box, ellipse=ellipse)
                 bms.append(bm)
 
+                ellipse_area = np.sum(bm)
+
                 # bm = get_box_image(im=bm, box=box)
                 image_mask = np.ma.getmask(im)
                 masked_bm = np.ma.array(bm, mask=image_mask)
 
                 area = np.ma.sum(masked_bm)
-                flux = np.ma.sum(im * bm)
-                flux_err = np.sqrt(flux - area * bg_threshold**2)
-                flux = flux - local_bg * area
+
+                flux = 0
+                flux_err = 0
+
+                if ellipse_area > area:
+                    flux = np.nan
+                    flux_err = np.nan
+                else:
+                    flux = np.ma.sum(im * bm)
+                    flux_err = np.sqrt(flux - area * bg_threshold**2)
+                    flux = flux - local_bg * area
+                
                 flux_segment.append(flux)
                 flux_segment_err.append(flux_err)
 
@@ -1007,7 +1014,7 @@ def run_photometry():
     centre = find_centre(im=im)
 
     plt.imshow(im)
-    plt.title("Masked Original Image")
+    plt.title("Original segment")
     plt.show()
 
     objects = []
@@ -1018,9 +1025,6 @@ def run_photometry():
 
     debug = False
 
-    data_dict = {}
-
-    obj_no = 1
     while centre is not None:
         im, objs, f, f_err = finding_masks(im=im, centre=centre, debug_mode=debug)
 
@@ -1045,7 +1049,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) >= 50: #99
+        if len(fluxes) == 700: #99
             debug = True
         else:
             debug = False
