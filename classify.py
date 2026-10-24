@@ -74,6 +74,7 @@ counts_err = np.sqrt(counts) / normalisation
 counts = counts / normalisation
 bins = (bins[1:] + bins[:-1]) / 2
 counts_err = np.sqrt(counts)
+
 plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
@@ -97,7 +98,7 @@ plt.plot(bins[2:12], log_line(bins[2:12], *popt))
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
 plt.ylabel("Cumulative N")
-# plt.ylabel("Cumulative N (per deg\u00b2 per 0.5 mag)")
+# plt.ylabel("Cumulative N (per deg\u00b2)")
 # plt.savefig('figures/cumulative_count_plot', dpi=300)
 plt.show()
 
