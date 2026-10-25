@@ -1175,9 +1175,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        # print(f"no clipped by the proprocessing mask {preprocessing_clipped}")
-        # print(f"no clipped by other objects {objects_clipped}")
-        if len(fluxes) >= 750: #99
+        if len(fluxes) >= 723: #99
             debug = True
         else:
             debug = False
