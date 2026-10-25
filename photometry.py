@@ -769,7 +769,7 @@ def finding_masks(im, centre, debug_mode):
 
     while (box_im_edge > threshold).sum() > (len(box_im_edge) / 2):
         # i.e. If the number of pixels on the edge that are above the
-        # threshold is larger than a quarter.
+        # threshold is larger than a half.
         box = create_box(centre=centre, prev_box=box, bounds=bounds, size=box_size, debug_mode=debug_mode)
         box_im = get_box_image(im=im, box=box)
 
@@ -1045,7 +1045,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) >= 50: #99
+        if len(fluxes) >= 723: #99
             debug = True
         else:
             debug = False
