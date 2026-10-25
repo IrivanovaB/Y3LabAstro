@@ -16,6 +16,10 @@ with open(shape_err_file, "r") as file:
     ratios_err = json.load(file)
     file.close()
 
+with open("peak_values.json", "r") as file:
+    pixel_peaks = json.load(file)
+    file.close()
+
 areas = []
 ratios = []
 peaks = []
@@ -61,8 +65,32 @@ indices = 1 - (flux_nan + ratios_nan)
 
 indices = np.unique(np.cumsum(indices))
 
+indices_r = 1 - ratios_nan
+indices_r = np.unique(np.cumsum(indices_r))
 
+areas = np.array(areas, dtype=float)
+peaks = np.array(peaks, dtype=float)
+pixel_peaks = np.array(pixel_peaks, dtype=float)
+areas = areas[indices_r]
+peaks = peaks[indices_r]
+pixel_peaks = pixel_peaks[indices_r]
 
+ratios = ratios[indices_r]
+
+plt.plot(ratios, pixel_peaks, "kx")
+plt.xlim((0, 2))
+plt.xlabel("Ratio of object (pix^2)")
+plt.ylabel("Pixle Peak")
+plt.grid()
+plt.show()
+
+peak_per_area = pixel_peaks/areas
+
+plt.hist(peak_per_area, bins=100)
+plt.ylabel("Count")
+plt.semilogy()
+plt.xlabel("Pixel peak value per area (power)")
+plt.show()
 
 
 
@@ -101,3 +129,7 @@ plt.ylim((0,3))
 plt.xlabel("Magnitudes")
 plt.ylabel("Ratios")
 plt.show()
+
+
+
+
