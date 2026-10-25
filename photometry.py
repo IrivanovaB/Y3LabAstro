@@ -672,8 +672,16 @@ def fit_ellipse(im, threshold): #this function was vibe coded with copilot to be
     Returns ``((center_x, center_y), (diameter_1, diameter_2), angle_degrees)``,
     with coordinates relative to ``im``.
     """
-    #im = np.asarray(im)
+    im = np.asarray(im)
+    #debug with copilot as masked objects are hard to work with
+    # data = np.ma.getdata(im)
+    # valid = ~np.ma.getmaskarray(im) & np.isfinite(data)
+    # plt.imshow(valid)
+    # plt.show()
+    # mask = np.ascontiguousarray((valid & (data >= threshold)).astype(np.uint8))
 
+    # plt.imshow(mask)
+    # plt.show()
     mask = np.ascontiguousarray(
         (np.isfinite(im) & (im >= threshold)).astype(np.uint8)
     )
@@ -708,7 +716,7 @@ def get_local_background(im, centre):
     return np.median(box_im.compressed())
 
 
-def finding_masks(im, centre, debug_mode):
+def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, objects_clipped):
     '''
     Masks a source.
 
@@ -733,13 +741,7 @@ def finding_masks(im, centre, debug_mode):
     )
     local_bg = get_local_background(im=im, centre=centre)
     threshold = local_bg + 3*bg_threshold
-
-    # if debug_mode:
-    #     print("HERE")
-    #     print(local_bg)
-    #     print(im[centre[0], centre[1]])
-    #     print(np.array([box_im.compressed() > threshold]).sum())
-    #     print(np.array([box_im > threshold]).sum())
+    #threshold = local_bg
 
     # if np.array([box_im.compressed() > local_bg]).sum() < 5:
     #     # print([box_im > local_bg])
@@ -778,11 +780,12 @@ def finding_masks(im, centre, debug_mode):
         )
 
         #box_in_sky(im=im, box=box, centre=centre)
-        if np.mean(box_im.compressed()) < threshold:
+        if np.mean(box_im.compressed()) < (threshold):
+            print("just a bright pixel amongst some noise")
             mask = np.zeros_like(im)
             mask[centre[0], centre[1]] = 1
             masked_image = np.ma.array(im, mask=mask)
-            return masked_image, [np.nan], [np.nan], [np.nan]
+            return masked_image, np.array([np.nan]), np.array([np.nan]), [np.nan], [np.nan], preprocessing_clipped, objects_clipped, [centre_pixel]
 
     if debug_mode:
         box_in_sky(im=im, box=box, centre=centre)
@@ -802,6 +805,8 @@ def finding_masks(im, centre, debug_mode):
     flux_segment_err = []
     objs = []
     objs_shifted = []
+    objs_err = []
+    peak_values = []
 
     try:
         if box[1] != box[2]:
@@ -811,12 +816,20 @@ def finding_masks(im, centre, debug_mode):
             box_im = np.ma.array(box_im, mask=edge_mask)
 
             obj = fit_ellipse(box_im, np.ma.median(box_im))
+            obj = [[obj[0][0], obj[0][1]], [obj[1][0], obj[1][1]], obj[2]]
             if debug_mode:
+                print(centre)
+                print(obj)
                 plot_ellipse(box_im=box_im, ellipse=obj)
 
 
-            ellipse_list = [[obj[0][0], obj[0][1]], [obj[1][0], obj[1][1]], obj[2]]
+            ellipse_list = [[obj[0][0], obj[0][1]], [obj[1][0], obj[1][1]], [obj[2], 0]]
             obj_shifted = shift_ellipse_coord(box=box, ellipse=ellipse_list)
+
+            def flatten(xss): #https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists
+                return [x for xs in xss for x in xs]
+            
+            obj_shifted = np.array(flatten(obj_shifted))
             objs_shifted.append(obj_shifted)
 
             if debug_mode:
@@ -837,18 +850,18 @@ def finding_masks(im, centre, debug_mode):
             flux = flux - local_bg * area
             flux_segment.append(flux)
             flux_segment_err.append(flux_err)
+
+            objs_err.append(np.nan)
+            peak_values.append(centre_pixel)
         else:
             if debug_mode:
                 print(f"threshold {threshold}")
-            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*threshold)
+            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=(threshold))
 
             if len(peaks) == 0:
                 #peaks = [[centre[1], centre[0]]]
                 peaks_i = np.unravel_index(np.argmax(box_im), np.shape(box_im))
                 peaks = [[peaks_i[0], peaks_i[1]]]
-
-            if debug_mode:
-                print(peaks)
 
             objs, cov = fit_n_gaussian(box_im=box_im, peaks=peaks, debug_mode=debug_mode)
 
@@ -872,20 +885,39 @@ def finding_masks(im, centre, debug_mode):
 
             for i, obj in enumerate(objs):
                 if obj[3] > box[2] or obj[4] > box[1]:
+                    print("Stdev outside the box")
                     #basically if stddev goes outside the box then the result is unreliable and we mask it as it is unphysical (possibly can denote how often this happens)
                     mask = np.zeros_like(im)
                     mask[centre[0], centre[1]] = 1
                     masked_image = get_new_image(mask=mask, box=box, im=im, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
-                    return masked_image, [np.nan], [np.nan]
+                    return masked_image, np.array([np.nan]), np.array([np.nan]), [np.nan], [np.nan], preprocessing_clipped, objects_clipped, [box_im[peaks[i][0], peaks[i][1]]]
                 #brute force: basically if fitted peak is not within stddev of actual peak
-                elif obj[1] > np.abs(peaks[i][0]-obj[3]) or obj[2] > np.abs(peaks[i][1]-obj[4]):
+                elif (obj[1] < np.abs(peaks[i][0]-obj[3])) or (obj[1] > np.abs(peaks[i][0]+obj[3])) or (obj[2] < np.abs(peaks[i][1]-obj[4])) or (obj[2] > np.abs(peaks[i][1]+obj[4])):
+                    print("peak outside the box")
                     obj[1] = peaks[i][0]
                     obj[2] = peaks[i][1]
+                if obj[3]*ellipse_size < 3 or obj[4]*ellipse_size < 3: #6 pixel detection limit
+                    print("Detected object too small")
+                    ellipse=get_ellipse_params(popt=obj)
+                    mask = get_binary_mask(im=im, box=box, ellipse=ellipse)
+                    masked_image = get_new_image(mask=mask, box=box, im=im, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
+                    return masked_image, np.array([np.nan]), np.array([np.nan]), [np.nan], [np.nan],preprocessing_clipped, objects_clipped, [box_im[peaks[i][0], peaks[i][1]]]
 
-                    #completely arbitrary and removes lots of information so could just do a catch all instead as this would be seen as an object
+                    #im, objs, objs_err, f, f_err, preprocessing_clipped, objects_clipped
 
 
                 ellipse = get_ellipse_params(popt=obj)
+
+                a = ellipse[1][0]
+                b = ellipse[1][1]
+                r = a/b
+
+                unc_a = np.sqrt(cov[9*i+4][9*i+4])*ellipse_size
+                unc_b = np.sqrt(cov[9*i+3][9*i+3])*ellipse_size
+
+                unc_r = (unc_a**2 + (unc_b*r)**2)/b**2
+
+                obj_err = np.sqrt(unc_r)
 
                 if debug_mode:
                     plot_ellipse(box_im=box_im, ellipse=ellipse)
@@ -896,16 +928,56 @@ def finding_masks(im, centre, debug_mode):
                 bm = get_binary_mask(im=im, box=box, ellipse=ellipse)
                 bms.append(bm)
 
+                ellipse_area = np.sum(bm)
+
                 # bm = get_box_image(im=bm, box=box)
                 image_mask = np.ma.getmask(im)
                 masked_bm = np.ma.array(bm, mask=image_mask)
 
                 area = np.ma.sum(masked_bm)
-                flux = np.ma.sum(im * bm)
-                flux_err = np.sqrt(flux - area * bg_threshold**2)
-                flux = flux - local_bg * area
+
+                flux = 0
+                flux_err = 0
+                
+
+                #i.e. if the fit is clipped by any mask
+                if ellipse_area > area:
+                    # #if ignoring these alternatively
+                    # flux = np.nan
+                    # flux_err = np.nan
+
+                    image_mask = np.ma.getmask(original_im)
+
+                    clipped_section = np.ma.array(bm, mask=image_mask)
+
+                    clipped_area = np.ma.sum(clipped_section)
+
+                    #if the fit is clipped by the preprocessing mask 
+                    if ellipse_area > clipped_area:
+                        preprocessing_clipped += 1 
+                        flux = np.nan
+                        flux_err = np.nan
+                    else:
+                        #only ellipse left
+                        #select_ellipse = np.ma.array(im, mask=clipped_section)
+                        select_ellipse = bm*original_im
+
+                        flux = np.ma.sum(select_ellipse)
+                        area = np.sum(bm) 
+
+                        flux_err = np.sqrt(flux - area * bg_threshold**2)
+                        flux = flux - local_bg * area
+                        objects_clipped += 1
+                else:
+                    flux = np.ma.sum(im * bm)
+                    flux_err = np.sqrt(flux - area * bg_threshold**2)
+                    flux = flux - local_bg * area
+
+                objs_err.append(obj_err)
                 flux_segment.append(flux)
                 flux_segment_err.append(flux_err)
+                peak_values.append(box_im[peaks[i][0], peaks[i][1]])
+
 
         # ellipse = get_ellipse_params(popt=objs)
         # plot_ellipse(box_im=box_im, ellipse=ellipse)
@@ -926,15 +998,12 @@ def finding_masks(im, centre, debug_mode):
             mask=bm, box=box, im=masked_image, padded_image=padded_image,
             edge_mask=edge_mask, padded=padded
         )
-        obj = [np.nan]
+        obj = np.array([np.nan])
         flux = [np.nan]
         flux_err = [np.nan]
-        return masked_image, obj, flux, flux_err
-    # except RuntimeError:
-    #     bm = np.where(box_im > np.median(box_im),
-    #                     np.ones_like(box_im), np.zeros_like(box_im))
-    #     obj = np.nan
-    #     flux = np.nan
+        objs_err = [np.nan]
+        peak_value = [centre_pixel]
+        return masked_image, obj, objs_err, flux, flux_err, preprocessing_clipped, objects_clipped, peak_value
 
 
     masked_image = im
@@ -946,11 +1015,14 @@ def finding_masks(im, centre, debug_mode):
         )
 
     if centre_pixel > saturation:
-        objs_shifted = [np.nan]
-        flux_segment = [np.nan]
-        flux_segment_err = [np.nan]
+            print("object oversaturated")
+            objs_shifted = np.array([np.nan])
+            flux_segment = [np.nan]
+            flux_segment_err = [np.nan]
+            objs_err = [np.nan]
+            peak_values = [im[centre]]
 
-    return masked_image, objs_shifted, flux_segment, flux_segment_err
+    return masked_image, objs_shifted, objs_err, flux_segment, flux_segment_err, preprocessing_clipped, objects_clipped, peak_values
 
 
 def run_photometry():
@@ -994,6 +1066,8 @@ def run_photometry():
     bottom[4607:4608, 690:692] = 1
     im = get_new_image(mask=bottom, box=None, im=im, padded_image=None, edge_mask=None, padded=False)
 
+    original_im = im
+
     #im[im>36000] = 36000
     #im = image[2560:4601, 1549:2500]
 
@@ -1007,10 +1081,11 @@ def run_photometry():
     centre = find_centre(im=im)
 
     plt.imshow(im)
-    plt.title("Masked Original Image")
+    plt.title("Original segment")
     plt.show()
 
     objects = []
+    objects_errors = []
     fluxes = []
     fluxes_err = []
     # with open("fluxes.json", "w") as flux_file:
@@ -1018,19 +1093,31 @@ def run_photometry():
 
     debug = False
 
-    data_dict = {}
+    data = {}
+    shape_batches = []
+    shape_err_batches = []
+    peak_batches = []
 
-    obj_no = 1
+    
+    preprocessing_clipped = 0
+    objects_clipped = 0
+
+    obj_i = 0
     while centre is not None:
-        im, objs, f, f_err = finding_masks(im=im, centre=centre, debug_mode=debug)
+        before_preprocessed = preprocessing_clipped
+        before_objects_clipped = objects_clipped
+        im, objs, objs_err, f, f_err, preprocessing_clipped, objects_clipped, peak_values = finding_masks(im=im, centre=centre, original_im=original_im, debug_mode=debug, preprocessing_clipped=preprocessing_clipped, objects_clipped=objects_clipped)
 
-        for obj in objs:
+
+        #if before_preprocessed < preprocessing_clipped: #i.e. more objects were clipped
+        for i, obj in enumerate(objs):
             objects.append(obj)
-        for flux in f:
-            fluxes.append(flux)
+            fluxes.append(f[i])
+            fluxes_err.append(f_err[i])
+            #data.update({"id": obj_i, "obj": obj, "flux":f[i], "flux error": f_err[i]})
+            obj_i += 1
 
-        for flux_err in f_err:
-            fluxes_err.append(flux_err)
+
 
         with open("fluxes.json", "w") as flux_file:
             json.dump([float(value) for value in fluxes], flux_file)
@@ -1039,6 +1126,21 @@ def run_photometry():
         with open("fluxes_err.json", "w") as flux_err_file:
             json.dump([float(value) for value in fluxes_err], flux_err_file)
             flux_err_file.close()
+
+        #print(objs)
+        shape_batches.append([obj.tolist() for obj in objs])
+        with open("shapes.json", "w") as shape_file:
+            json.dump([shape for batch in shape_batches for shape in batch], shape_file)
+
+        shape_err_batches.append([float(err) for err in objs_err])
+        with open("shapes_err.json", "w") as shape_err_file:
+            json.dump([err for batch in shape_err_batches for err in batch], shape_err_file)
+            shape_err_file.close()
+
+        peak_batches.append([float(peak) for peak in peak_values])
+        with open("peak_values.json", "w") as peak_file:
+            json.dump([peak for batch in peak_batches for peak in batch], peak_file)
+            peak_file.close()
 
         centre = find_centre(im=im)
         # plt.imshow(segment)
@@ -1049,6 +1151,8 @@ def run_photometry():
             debug = True
         else:
             debug = False
+
+    
 
 
 run_photometry()

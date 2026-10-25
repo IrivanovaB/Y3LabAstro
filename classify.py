@@ -7,8 +7,11 @@ from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize
+from scipy.stats import cumfreq
 
 
+flux_file = "data runs/fluxes running.json"
+flux_err_file = "data runs/fluxes_err running.json"
 flux_file = "data runs/fluxes running.json"
 flux_err_file = "data runs/fluxes_err running.json"
 
@@ -29,7 +32,7 @@ magerr = 2.000E-02
 gain = 3.1
 exposure_time = 720
 normalisation = 0.0564
-# normalisation = 1
+#normalisation = 1
 
 
 with open(flux_file, "r") as file:
@@ -80,6 +83,8 @@ plt.legend()
 plt.show()
 
 counts, bins = np.histogram(magnitudes, bins=bins)
+# #counts, bins = cumfreq(magnitudes, numbins=len(bins))
+# counts = np.cumsum(counts)
 counts_err = np.sqrt(counts) / normalisation
 counts = counts / normalisation
 bins = (bins[1:] + bins[:-1]) / 2
@@ -101,6 +106,8 @@ def log_line(x, m, c):
 popt, pcov = optimize.curve_fit(
     log_line, xdata=bins[4:12], ydata=counts[4:12], sigma=counts_err[4:12]
 )
+
+print(f'slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
 
 plt.errorbar(bins, counts, yerr=counts_err, fmt='.', capsize=4, label='Data')
 plt.plot(bins[4:12], log_line(bins[4:12], *popt), label='Fit')
