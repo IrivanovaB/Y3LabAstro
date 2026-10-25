@@ -673,7 +673,15 @@ def fit_ellipse(im, threshold): #this function was vibe coded with copilot to be
     with coordinates relative to ``im``.
     """
     im = np.asarray(im)
+    #debug with copilot as masked objects are hard to work with
+    # data = np.ma.getdata(im)
+    # valid = ~np.ma.getmaskarray(im) & np.isfinite(data)
+    # plt.imshow(valid)
+    # plt.show()
+    # mask = np.ascontiguousarray((valid & (data >= threshold)).astype(np.uint8))
 
+    # plt.imshow(mask)
+    # plt.show()
     mask = np.ascontiguousarray(
         (np.isfinite(im) & (im >= threshold)).astype(np.uint8)
     )
@@ -733,13 +741,7 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
     )
     local_bg = get_local_background(im=im, centre=centre)
     threshold = local_bg + 3*bg_threshold
-
-    # if debug_mode:
-    #     print("HERE")
-    #     print(local_bg)
-    #     print(im[centre[0], centre[1]])
-    #     print(np.array([box_im.compressed() > threshold]).sum())
-    #     print(np.array([box_im > threshold]).sum())
+    #threshold = local_bg
 
     # if np.array([box_im.compressed() > local_bg]).sum() < 5:
     #     # print([box_im > local_bg])
@@ -778,7 +780,8 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
         )
 
         #box_in_sky(im=im, box=box, centre=centre)
-        if np.mean(box_im.compressed()) < threshold:
+        if np.mean(box_im.compressed()) < (threshold):
+            print("just a bright pixel amongst some noise")
             mask = np.zeros_like(im)
             mask[centre[0], centre[1]] = 1
             masked_image = np.ma.array(im, mask=mask)
@@ -811,8 +814,12 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
 
             box_im = np.ma.array(box_im, mask=edge_mask)
 
-            obj = fit_ellipse(box_im, np.median(box_im))
-            #plot_ellipse(box_im=box_im, ellipse=obj)
+            obj = fit_ellipse(box_im, np.ma.median(box_im))
+            obj = [[obj[0][0], obj[0][1]], [obj[1][0], obj[1][1]], obj[2]]
+            if debug_mode:
+                print(centre)
+                print(obj)
+                plot_ellipse(box_im=box_im, ellipse=obj)
 
 
             ellipse_list = [[obj[0][0], obj[0][1]], [obj[1][0], obj[1][1]], [obj[2], 0]]
@@ -847,7 +854,7 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
         else:
             if debug_mode:
                 print(f"threshold {threshold}")
-            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=1.1*threshold)
+            peaks = peak_local_max(box_im, min_distance=6, threshold_abs=(threshold))
 
             if len(peaks) == 0:
                 #peaks = [[centre[1], centre[0]]]
@@ -876,17 +883,25 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
 
             for i, obj in enumerate(objs):
                 if obj[3] > box[2] or obj[4] > box[1]:
+                    print("Stdev outside the box")
                     #basically if stddev goes outside the box then the result is unreliable and we mask it as it is unphysical (possibly can denote how often this happens)
                     mask = np.zeros_like(im)
                     mask[centre[0], centre[1]] = 1
                     masked_image = get_new_image(mask=mask, box=box, im=im, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
-                    return masked_image, np.array([np.nan]), [np.nan], preprocessing_clipped, objects_clipped
+                    return masked_image, np.array([np.nan]), np.array([np.nan]), [np.nan], [np.nan], preprocessing_clipped, objects_clipped
                 #brute force: basically if fitted peak is not within stddev of actual peak
-                elif obj[1] > np.abs(peaks[i][0]-obj[3]) or obj[2] > np.abs(peaks[i][1]-obj[4]):
+                elif (obj[1] < np.abs(peaks[i][0]-obj[3])) or (obj[1] > np.abs(peaks[i][0]+obj[3])) or (obj[2] < np.abs(peaks[i][1]-obj[4])) or (obj[2] > np.abs(peaks[i][1]+obj[4])):
+                    print("peak outside the box")
                     obj[1] = peaks[i][0]
                     obj[2] = peaks[i][1]
+                if obj[3]*ellipse_size < 3 or obj[4]*ellipse_size < 3: #6 pixel detection limit
+                    print("Detected object too small")
+                    ellipse=get_ellipse_params(popt=obj)
+                    mask = get_binary_mask(im=im, box=box, ellipse=ellipse)
+                    masked_image = get_new_image(mask=mask, box=box, im=im, padded_image=padded_image, edge_mask=edge_mask, padded=padded)
+                    return masked_image, np.array([np.nan]), np.array([np.nan]), [np.nan], [np.nan],preprocessing_clipped, objects_clipped
 
-                    #completely arbitrary and removes lots of information so could just do a catch all instead as this would be seen as an object
+                    #im, objs, objs_err, f, f_err, preprocessing_clipped, objects_clipped
 
 
                 ellipse = get_ellipse_params(popt=obj)
@@ -895,8 +910,8 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
                 b = ellipse[1][1]
                 r = a/b
 
-                unc_a = np.sqrt(cov[i*4][i*4])*ellipse_size
-                unc_b = np.sqrt(cov[i*3][i*3])*ellipse_size
+                unc_a = np.sqrt(cov[9*i+4][9*i+4])*ellipse_size
+                unc_b = np.sqrt(cov[9*i+3][9*i+3])*ellipse_size
 
                 unc_r = (unc_a**2 + (unc_b*r)**2)/b**2
 
@@ -985,11 +1000,6 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
         flux_err = [np.nan]
         objs_err = [np.nan]
         return masked_image, obj, objs_err, flux, flux_err, preprocessing_clipped, objects_clipped
-    # except RuntimeError:
-    #     bm = np.where(box_im > np.median(box_im),
-    #                     np.ones_like(box_im), np.zeros_like(box_im))
-    #     obj = np.nan
-    #     flux = np.nan
 
 
     masked_image = im
@@ -1001,10 +1011,11 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
         )
 
     if centre_pixel > saturation:
-        objs_shifted = np.array([np.nan])
-        flux_segment = [np.nan]
-        flux_segment_err = [np.nan]
-        objs_err = [np.nan]
+            print("object oversaturated")
+            objs_shifted = np.array([np.nan])
+            flux_segment = [np.nan]
+            flux_segment_err = [np.nan]
+            objs_err = [np.nan]
 
     return masked_image, objs_shifted, objs_err, flux_segment, flux_segment_err, preprocessing_clipped, objects_clipped 
 
@@ -1125,9 +1136,9 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        print(f"no clipped by the proprocessing mask {preprocessing_clipped}")
-        print(f"no clipped by other objects {objects_clipped}")
-        if len(fluxes) >= 750: #99
+        # print(f"no clipped by the proprocessing mask {preprocessing_clipped}")
+        # print(f"no clipped by other objects {objects_clipped}")
+        if len(fluxes) >= 10: #99
             debug = True
         else:
             debug = False

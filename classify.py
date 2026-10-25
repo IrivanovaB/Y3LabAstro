@@ -86,7 +86,7 @@ plt.ylabel("N")
 # plt.savefig('figures/count_plot', dpi=300)
 plt.show()
 
-#counts = counts.cumsum()
+counts = counts.cumsum()
 counts_err = np.sqrt(counts)
 
 def log_line(x, m, c):
