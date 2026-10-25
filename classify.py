@@ -78,6 +78,7 @@ counts_err = np.sqrt(counts) / normalisation
 counts = counts / normalisation
 bins = (bins[1:] + bins[:-1]) / 2
 counts_err = np.sqrt(counts)
+
 plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
