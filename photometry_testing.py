@@ -73,7 +73,7 @@ def background_box(sample=10000, box_size=[101, 101]):
     z_score_10_err = np.sqrt(z_score_10*(1-z_score_10) / sample)
 
     print('STATISTICS')
-    print(f'Local background fluctuation = {std:.4f} +/- {std_err:.4f}')
+    print(f'Local background fluctuation = {std:.4f} +/- {std_err:.4f} ADU')
     print(f'P(median offset < 0.1σ) = {z_score_01:.4f} +/- {z_score_01_err:.4f}')
     print(f'P(median offset < 1.0σ) = {z_score_10:.4f} +/- {z_score_10_err:.4f}')
     print(f'Samples = {sample}')

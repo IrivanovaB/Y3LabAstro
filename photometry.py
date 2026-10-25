@@ -1045,7 +1045,7 @@ def run_photometry():
         # plt.title("Edge object removed from segment")
         # plt.show()
         print(len(fluxes))
-        if len(fluxes) >= 50: #99
+        if len(fluxes) >= 723: #99
             debug = True
         else:
             debug = False
