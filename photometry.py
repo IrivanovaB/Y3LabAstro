@@ -870,7 +870,7 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
             objs_err.append(np.nan)
             peak_values.append(centre_pixel)
             noise = np.sqrt(flux + (11*area)**2)
-            snr.append((flux-local_bg)/noise)
+            snr.append((flux)/noise)
         else:
             if debug_mode:
                 print(f"threshold {threshold}")
@@ -996,7 +996,7 @@ def finding_masks(im, centre, debug_mode, original_im, preprocessing_clipped, ob
                 flux_segment_err.append(flux_err)
                 peak_values.append(box_im[peaks[i][0], peaks[i][1]])
                 noise = np.sqrt(flux + (11*area)**2)
-                snr.append((flux-local_bg)/noise)
+                snr.append((flux)/noise)
 
 
         # ellipse = get_ellipse_params(popt=objs)

@@ -58,46 +58,42 @@ fluxes = np.array(fluxes, dtype=float)
 fluxes_err = np.array(fluxes_err, dtype=float)
 ratios_err = np.array(ratios_err, dtype=float)
 
-flux_nan = np.isnan(fluxes)
-ratios_nan = np.isnan(ratios)
+valid = np.isfinite(fluxes) & np.isfinite(ratios)
 
-indices = 1 - (flux_nan + ratios_nan)
+# valid_r = np.isfinite(ratios)
 
-indices = np.unique(np.cumsum(indices))
+# areas = np.array(areas, dtype=float)
+# peaks = np.array(peaks, dtype=float)
+# pixel_peaks = np.array(pixel_peaks, dtype=float)
 
-indices_r = 1 - ratios_nan
-indices_r = np.unique(np.cumsum(indices_r))
+# areas = areas[valid_r]
+# peaks = peaks[valid_r]
+# pixel_peaks = pixel_peaks[valid_r]
 
-areas = np.array(areas, dtype=float)
-peaks = np.array(peaks, dtype=float)
-pixel_peaks = np.array(pixel_peaks, dtype=float)
-areas = areas[indices_r]
-peaks = peaks[indices_r]
-pixel_peaks = pixel_peaks[indices_r]
+#ratios = ratios[valid_r]
 
-ratios = ratios[indices_r]
+# plt.plot(ratios, pixel_peaks, "kx")
+# plt.xlim((0, 2))
+# plt.xlabel("Ratio of object (pix^2)")
+# plt.ylabel("Pixle Peak")
+# plt.grid()
+# plt.show()
 
-plt.plot(ratios, pixel_peaks, "kx")
-plt.xlim((0, 2))
-plt.xlabel("Ratio of object (pix^2)")
-plt.ylabel("Pixle Peak")
-plt.grid()
-plt.show()
+# peak_per_area = pixel_peaks/areas
 
-peak_per_area = pixel_peaks/areas
-
-plt.hist(peak_per_area, bins=100)
-plt.ylabel("Count")
-plt.semilogy()
-plt.xlabel("Pixel peak value per area (power)")
-plt.show()
+# plt.hist(peak_per_area, bins=100)
+# plt.ylabel("Count")
+# plt.semilogy()
+# plt.xlabel("Pixel peak value per area (power)")
+# plt.show()
 
 
 
-fluxes = fluxes[indices]
-ratios = ratios[indices]
-fluxes_err = fluxes_err[indices]
-ratios_err = ratios_err[indices]
+
+fluxes = fluxes[valid]
+ratios = ratios[valid]
+fluxes_err = fluxes_err[valid]
+ratios_err = ratios_err[valid]
 
 
 # plt.plot(ratios, fluxes, "x")
