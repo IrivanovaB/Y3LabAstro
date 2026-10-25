@@ -12,6 +12,8 @@ from scipy.stats import cumfreq
 
 flux_file = "data runs/fluxes running.json"
 flux_err_file = "data runs/fluxes_err running.json"
+flux_file = "data runs/fluxes running.json"
+flux_err_file = "data runs/fluxes_err running.json"
 
 # mosaic = fits.open('Fits_Data/mosaic.fits')
 # header = mosaic[0].header
@@ -62,30 +64,37 @@ magnitudes = magzpt - 2.5 * np.log10(fluxes)
 # plt.title("Magnitude v Flux")
 # plt.show()
 
-plt.plot(magnitudes, magnitudes_err, 'ko')
-plt.grid()
+bins = np.arange(14, 24.5, 0.5)
+magnitudes_err_binned = []
+
+for b in bins[:-1]:
+    err = magnitudes_err[(magnitudes > b) & (magnitudes < (b+0.5))]
+    if len(err) == 0:
+        magnitudes_err_binned.append(0)
+    else:
+        err = np.sqrt(np.sum(err**2)) / len(err)
+        magnitudes_err_binned.append(err)
+
+plt.plot(magnitudes, magnitudes_err, '.', ms=4, alpha=0.5, label='Source')
 plt.xlabel('Apparent magnitude')
-plt.ylabel('Uncertainty')
-plt.ylim((-0.1, 1.5))
+plt.ylabel('Magnitude uncertainty')
+plt.legend()
 # plt.savefig('figures/magnitude_uncertainty', dpi=300)
 plt.show()
 
-bins = np.arange(np.min(magnitudes)-0.5, np.max(magnitudes)+0.5, 0.5)
 counts, bins = np.histogram(magnitudes, bins=bins)
 # #counts, bins = cumfreq(magnitudes, numbins=len(bins))
 # counts = np.cumsum(counts)
 counts_err = np.sqrt(counts) / normalisation
 counts = counts / normalisation
 bins = (bins[1:] + bins[:-1]) / 2
-counts_err = np.sqrt(counts)
 
-plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
+plt.errorbar(bins, counts, xerr=magnitudes_err_binned, yerr=counts_err, fmt='.', capsize=4, label='Data')
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
-plt.ylabel("N")
-
-# plt.ylabel("N (per deg\u00b2 per 0.5 mag)")
-# plt.savefig('figures/count_plot', dpi=300)
+plt.ylabel("N (per deg\u00b2 per 0.5 mag)")
+plt.legend()
+# plt.savefig('figures/normalised_count_plot', dpi=300)
 plt.show()
 
 counts = counts.cumsum()
@@ -95,26 +104,22 @@ def log_line(x, m, c):
     return 10**(x*m + c)
 
 popt, pcov = optimize.curve_fit(
-    log_line, xdata=bins[2:12], ydata=counts[2:12], sigma=counts_err[2:12]
+    log_line, xdata=bins[4:12], ydata=counts[4:12], sigma=counts_err[4:12]
 )
 
 print(f'slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
 
-plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
-line_x = bins[2:12]
-line_x = np.append(line_x, 14)
-line_x = np.append(line_x, 21)
-plt.plot(line_x, log_line(line_x, *popt), label="Gradient = 0.42 ± 0.03")
+plt.errorbar(bins, counts, yerr=counts_err, fmt='.', capsize=4, label='Data')
+plt.plot(bins[4:12], log_line(bins[4:12], *popt), label='Fit')
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
-plt.ylabel("Cumulative N")
-plt.grid()
-plt.legend(loc='lower right')
-plt.title("Cumulative Count per Apparent Magnitudes")
-plt.xlim((15, 20))
-plt.ylim((10, 12000))
-# plt.ylabel("Cumulative N (per deg\u00b2 per 0.5 mag)")
-# plt.savefig('figures/cumulative_count_plot', dpi=300)
+plt.ylabel("Cumulative N (per deg\u00b2)")
+plt.legend()
+# plt.savefig('figures/normalised_cumulative_count_plot', dpi=300)
 plt.show()
 
+uncertainty_01 = magnitudes_err[(magnitudes > 16) & (magnitudes < 20)]
+uncertainty_01 = (uncertainty_01 < 0.1).sum() / len(uncertainty_01)
 
+print('STATISTCIS')
+print(f'Slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
