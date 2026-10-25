@@ -10,8 +10,8 @@ from scipy import optimize
 from scipy.stats import cumfreq
 
 
-flux_file = "fluxes.json"
-flux_err_file = "fluxes_err.json"
+flux_file = "data runs/fluxes running.json"
+flux_err_file = "data runs/fluxes_err running.json"
 
 # mosaic = fits.open('Fits_Data/mosaic.fits')
 # header = mosaic[0].header
@@ -100,13 +100,18 @@ popt, pcov = optimize.curve_fit(
 print(f'slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
 
 plt.errorbar(bins, counts, yerr=counts_err, fmt='x')
-plt.plot(bins[2:12], log_line(bins[2:12], *popt), label="Slope = 0.42 ± 0.03")
+line_x = bins[2:12]
+line_x = np.append(line_x, 14)
+line_x = np.append(line_x, 21)
+plt.plot(line_x, log_line(line_x, *popt), label="Gradient = 0.42 ± 0.03")
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
 plt.ylabel("Cumulative N")
 plt.grid()
-plt.title("Cumulative N Count per Apparent Magnitudes")
+plt.legend(loc='lower right')
+plt.title("Cumulative Count per Apparent Magnitudes")
 plt.xlim((15, 20))
+plt.ylim((10, 12000))
 # plt.ylabel("Cumulative N (per deg\u00b2 per 0.5 mag)")
 # plt.savefig('figures/cumulative_count_plot', dpi=300)
 plt.show()
