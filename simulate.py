@@ -131,15 +131,17 @@ popt, pcov = optimize.curve_fit(
     line, xdata=magnitudes, ydata=mags, sigma=mags_err
 )
 
-plt.errorbar(magnitudes, mags, mags_err, fmt='x', label='Data')
-plt.plot(np.array([13, 25]), line(np.array([13, 25]), *popt), label='Fit')
+plt.errorbar(magnitudes, mags, mags_err, fmt='.', capsize=4, color='black')
+plt.plot(np.array([12, 28]), line(np.array([12, 28]), *popt), color='red', label='Fit')
 plt.xlabel('Actual magnitude')
 plt.ylabel('Detected magnitude')
 plt.grid()
 plt.axis('square')
+plt.xlim(13, 26)
+plt.ylim(13, 28)
 plt.legend()
 plt.tight_layout()
-# plt.savefig('figures/magnitude_simulation', dpi=300)
+plt.savefig('figures/magnitude_simulation', dpi=300)
 plt.show()
 
 print('STATISTICS')

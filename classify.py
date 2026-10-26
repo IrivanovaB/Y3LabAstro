@@ -84,7 +84,8 @@ counts_err = np.sqrt(counts) / normalisation
 counts = counts / normalisation
 bins = (bins[1:] + bins[:-1]) / 2
 
-plt.errorbar(bins, counts, xerr=magnitudes_err_binned, yerr=counts_err, fmt='.', capsize=4, label='Data')
+plt.axvspan(16, 20, color="lightblue", alpha=0.3, label='Valid mag')
+plt.errorbar(bins, counts, xerr=magnitudes_err_binned, yerr=counts_err, fmt='.', capsize=4, color='black', label='Data')
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
 plt.ylabel("N (per deg\u00b2 per 0.5 mag)")
@@ -102,11 +103,28 @@ popt, pcov = optimize.curve_fit(
     log_line, xdata=bins[4:12], ydata=counts[4:12], sigma=counts_err[4:12]
 )
 
-plt.errorbar(bins, counts, yerr=counts_err, fmt='.', capsize=4, label='Data')
-plt.plot(bins[4:12], log_line(bins[4:12], *popt), label='Fit')
+# def line(x, m, c):
+#     return x*m + c
+
+# popt, pcov = optimize.curve_fit(
+#     line, xdata=bins[4:12], ydata=np.log10(counts[4:12])
+# )
+
+plt.axvspan(16, 20, color="lightblue", alpha=0.3, label='Valid mag')
+plt.errorbar(bins, counts, yerr=counts_err, fmt='.', capsize=4, color='black', label='Data')
+plt.plot(np.array([16, 20]), log_line(np.array([16, 20]), *popt), color='red', label='Fit ± σ')
+plt.plot(np.array([14, 22]), log_line(np.array([14, 22]), *popt), '--', color="red")
+plt.fill_between(
+    np.array([14, 22]),
+    log_line(np.array([14, 22]), popt[0]+np.sqrt(pcov[0][0]), popt[1]-np.sqrt(pcov[1][1])),
+    log_line(np.array([14, 22]), popt[0]-np.sqrt(pcov[0][0]), popt[1]+np.sqrt(pcov[1][1])),
+    color="orange", alpha=0.4
+)
 plt.semilogy()
 plt.xlabel("Apparent magnitude")
 plt.ylabel("Cumulative N (per deg\u00b2)")
+plt.xlim(14, 24)
+plt.ylim(top=2e4)
 plt.legend()
 # plt.savefig('figures/normalised_cumulative_count_plot', dpi=300)
 plt.show()
@@ -116,3 +134,4 @@ uncertainty_01 = (uncertainty_01 < 0.1).sum() / len(uncertainty_01)
 
 print('STATISTCIS')
 print(f'Slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
+print(f'y-intercept = {popt[1]:.4f} +/- {np.sqrt(pcov[1][1]):.4f}')
