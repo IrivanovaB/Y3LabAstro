@@ -57,17 +57,59 @@ fluxes = fluxes[valid]
 snr = snr[valid]
 areas = areas[valid]
 ratios = ratios[valid]
+fluxes_err = fluxes_err[valid]
 
 
 magzpt = 2.530E+01
 magerr = 2.000E-02
 gain = 3.1
 exposure_time = 720
+normalisation = 0.0564
+#normalisation = 1
+
+
 fluxes = fluxes * gain / exposure_time
+fluxes_err = fluxes_err * gain / exposure_time
+
+magnitudes_err = - 2.5 / np.log(10) * fluxes_err / fluxes
+magnitudes_err = np.sqrt(magerr**2 + magnitudes_err**2)
 magnitudes = magzpt - 2.5 * np.log10(fluxes)
+#snr = 10 * np.log10(snr)
 
 
-snr = 10 * np.log10(snr)
+bins = np.arange(14, 24.5, 0.5)
+magnitudes_err_binned = []
+avg_snr = []
+seom = []
+
+for b in bins[:-1]:
+    snrs = snr[(magnitudes > b) & (magnitudes < (b+0.5))]
+    err = magnitudes_err[(magnitudes > b) & (magnitudes < (b+0.5))]
+    if len(err) == 0:
+        magnitudes_err_binned.append(0)
+        avg_snr.append(np.nan)
+        seom.append(np.nan)
+    else:
+        err = np.sqrt(np.sum(err**2)) / len(err)
+        magnitudes_err_binned.append(err)
+        avg_snr.append(np.mean(snrs))
+        seom.append(np.std(snrs)/np.sqrt(len(snrs)))
+
+# avg_snr = 10*np.log10(avg_snr)
+# seom = np.abs(10*np.log10(seom))
+plt.semilogy()
+#plt.plot(bins[:-1], avg_snr, "ko")
+plt.errorbar(bins[:-1], avg_snr, xerr=magnitudes_err_binned, yerr=seom, fmt="ko", capsize=4)
+#plt.plot(bins[:-1], avg_snr, "ko", label="SNR")
+#plt.title("Average SNR per magnitude")
+plt.xlabel("Apparent magnitude")
+plt.ylabel("Average SNR")
+plt.axvspan(16, 20, color="lightblue", alpha=0.3, label="Valid mag")
+plt.legend(loc="lower left")
+#plt.grid()
+plt.tight_layout()
+plt.savefig('figures_presentation/fig_9', dpi=300)
+plt.show()
 
 plt.plot(magnitudes, snr, "x", label = "object")
 plt.title("SNR Per Object Magnitude")

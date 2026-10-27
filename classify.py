@@ -10,10 +10,11 @@ from scipy import optimize
 from scipy.stats import cumfreq
 
 
-flux_file = "data runs/fluxes running.json"
-flux_err_file = "data runs/fluxes_err running.json"
-flux_file = "data runs/fluxes running.json"
-flux_err_file = "data runs/fluxes_err running.json"
+flux_file = "data/fluxes.json"
+flux_err_file = "data/fluxes_err.json"
+flux_file = "data/fluxes.json"
+flux_err_file = "data/fluxes_err.json"
+
 
 # mosaic = fits.open('Fits_Data/mosaic.fits')
 # header = mosaic[0].header
@@ -56,6 +57,9 @@ fluxes_err = fluxes_err * gain / exposure_time
 magnitudes_err = - 2.5 / np.log(10) * fluxes_err / fluxes
 magnitudes_err = np.sqrt(magerr**2 + magnitudes_err**2)
 magnitudes = magzpt - 2.5 * np.log10(fluxes)
+
+plt.hist(magnitudes_err)
+plt.show()
 
 # plt.plot(fluxes, magnitudes, "x")
 # plt.grid()

@@ -2,7 +2,7 @@
 A module for simulated sources.
 '''
 
-from photometry_functional import finding_masks
+from archive.photometry_functional import finding_masks
 import numpy as np
 from maths import gaussian_2d
 import matplotlib.pyplot as plt
