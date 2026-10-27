@@ -1,46 +1,35 @@
 '''
-A module for the galaxy number count.
+A module for the galaxy number count plot.
 '''
 
 import json
-from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize
-from scipy.stats import cumfreq
 
 
-flux_file = "data runs/fluxes running.json"
-flux_err_file = "data runs/fluxes_err running.json"
-flux_file = "data runs/fluxes running.json"
-flux_err_file = "data runs/fluxes_err running.json"
+# File paths.
+flux_file = 'data/fluxes.json'
+flux_err_file = 'data/fluxes_err.json'
 
-# mosaic = fits.open('Fits_Data/mosaic.fits')
-# header = mosaic[0].header
+with open(flux_file, 'r') as file:
+    fluxes = json.load(file)
 
+with open(flux_err_file, 'r') as file:
+    fluxes_err = json.load(file)
 
-#Sky calibration correction (mags)              
-# MAGZPT  =            2.530E+01 / 
-# Photometric ZP (mags) for default extinction   
-# MAGZRR  =            2.000E-02 / 
-# Photometric ZP error (mags)                    
-# PV2_1   =             1.00E+00 / &                                             
-#  PV2_3   =             3.75E+02 / & 
-
+# Constants.
 magzpt = 2.530E+01
 magerr = 2.000E-02
 gain = 3.1
 exposure_time = 720
 normalisation = 0.0564
-#normalisation = 1
+
+# Histogram bins.
+bins = np.arange(14, 24.5, 0.5)
 
 
-with open(flux_file, "r") as file:
-    fluxes = json.load(file)
-
-with open(flux_err_file, "r") as file:
-    fluxes_err = json.load(file)
-
+# Converts from pixel flux to apparent magnitude.
 fluxes = np.array(fluxes, dtype=float)
 fluxes_err = np.array(fluxes_err, dtype=float)
 
@@ -57,16 +46,8 @@ magnitudes_err = - 2.5 / np.log(10) * fluxes_err / fluxes
 magnitudes_err = np.sqrt(magerr**2 + magnitudes_err**2)
 magnitudes = magzpt - 2.5 * np.log10(fluxes)
 
-# plt.plot(fluxes, magnitudes, "x")
-# plt.grid()
-# plt.xlabel("Fluxes (in base 10 and corrected)")
-# plt.ylabel("Magnitude")
-# plt.title("Magnitude v Flux")
-# plt.show()
-
-bins = np.arange(14, 24.5, 0.5)
+# Calculates the error in each magnitude bin.
 magnitudes_err_binned = []
-
 for b in bins[:-1]:
     err = magnitudes_err[(magnitudes > b) & (magnitudes < (b+0.5))]
     if len(err) == 0:
@@ -75,6 +56,7 @@ for b in bins[:-1]:
         err = np.sqrt(np.sum(err**2)) / len(err)
         magnitudes_err_binned.append(err)
 
+# Plots the uncertainty in the magnitude.
 plt.plot(magnitudes, magnitudes_err, '.', ms=4, alpha=0.5, label='Source')
 plt.xlabel('Apparent magnitude')
 plt.ylabel('Magnitude uncertainty')
@@ -82,44 +64,62 @@ plt.legend()
 # plt.savefig('figures/magnitude_uncertainty', dpi=300)
 plt.show()
 
+# Binning and normalisation.
 counts, bins = np.histogram(magnitudes, bins=bins)
-# #counts, bins = cumfreq(magnitudes, numbins=len(bins))
-# counts = np.cumsum(counts)
 counts_err = np.sqrt(counts) / normalisation
 counts = counts / normalisation
 bins = (bins[1:] + bins[:-1]) / 2
 
-plt.errorbar(bins, counts, xerr=magnitudes_err_binned, yerr=counts_err, fmt='.', capsize=4, label='Data')
+# Plots the non-cumulative count plot.
+plt.axvspan(16, 20, color='lightblue', alpha=0.3, label='Valid mag')
+plt.errorbar(bins, counts, xerr=magnitudes_err_binned, yerr=counts_err,
+             fmt='.', capsize=4, color='black', label='Data')
 plt.semilogy()
-plt.xlabel("Apparent magnitude")
-plt.ylabel("N (per deg\u00b2 per 0.5 mag)")
+plt.xlabel('Apparent magnitude')
+plt.ylabel('N (per deg\u00b2 per 0.5 mag)')
 plt.legend()
 # plt.savefig('figures/normalised_count_plot', dpi=300)
 plt.show()
 
+# Cumulative counts.
 counts = counts.cumsum()
 counts_err = np.sqrt(counts)
 
+# Line fitting.
 def log_line(x, m, c):
+    '''
+    A straight line in a logged y-axis.
+    '''
     return 10**(x*m + c)
 
 popt, pcov = optimize.curve_fit(
     log_line, xdata=bins[4:12], ydata=counts[4:12], sigma=counts_err[4:12]
 )
 
-print(f'slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
+perr = np.sqrt(np.diag(pcov))
+fit_plus = log_line(np.array([14, 22]), popt[0]+perr[0], popt[1]-perr[1])
+fit_minus = log_line(np.array([14, 22]), popt[0]-perr[0], popt[1]+perr[1])
 
-plt.errorbar(bins, counts, yerr=counts_err, fmt='.', capsize=4, label='Data')
-plt.plot(bins[4:12], log_line(bins[4:12], *popt), label='Fit')
+# Plots the cumulative count plot.
+plt.axvspan(16, 20, color='lightblue', alpha=0.3, label='Valid mag')
+plt.errorbar(bins, counts, yerr=counts_err, fmt='.',
+             capsize=4, color='black', label='Data')
+plt.plot(np.array([16, 20]), log_line(np.array([16, 20]), *popt),
+         color='red', label='Fit ± σ')
+plt.plot(np.array([14, 22]), log_line(np.array([14, 22]), *popt), '--',
+         color='red')
+plt.fill_between(np.array([14, 22]), fit_plus, fit_minus,
+                 color='orange', alpha=0.4)
 plt.semilogy()
-plt.xlabel("Apparent magnitude")
-plt.ylabel("Cumulative N (per deg\u00b2)")
+plt.xlabel('Apparent magnitude')
+plt.ylabel('Cumulative N (per deg\u00b2)')
+plt.xlim(14, 24)
+plt.ylim(top=2e4)
 plt.legend()
 # plt.savefig('figures/normalised_cumulative_count_plot', dpi=300)
 plt.show()
 
-uncertainty_01 = magnitudes_err[(magnitudes > 16) & (magnitudes < 20)]
-uncertainty_01 = (uncertainty_01 < 0.1).sum() / len(uncertainty_01)
-
+# Fit result.
 print('STATISTCIS')
 print(f'Slope = {popt[0]:.4f} +/- {np.sqrt(pcov[0][0]):.4f}')
+print(f'y-intercept = {popt[1]:.4f} +/- {np.sqrt(pcov[1][1]):.4f}')
