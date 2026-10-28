@@ -5,18 +5,18 @@ This project is using object detection to count the number of astronomical objec
 
 This directory works as follows:
 
-Y3LabAstro/
-    archived/
+Y3LabAstro
+    archived
         old files 
-    CCfits_source/
+    CCfits_source
         information about CC fits
-    data/
+    data
         the folder where the output data is loaded into
-    figures/
+    figures
         figures generated during testing
-    figures_presentation/
+    figures_presentation
         figures generated that are used in the presentation
-    Fits_Data/
+    Fits_Data
         the input image and various alterations to it
 
     analysis.py
