@@ -46,6 +46,9 @@ magnitudes_err = - 2.5 / np.log(10) * fluxes_err / fluxes
 magnitudes_err = np.sqrt(magerr**2 + magnitudes_err**2)
 magnitudes = magzpt - 2.5 * np.log10(fluxes)
 
+plt.hist(magnitudes_err)
+plt.show()
+
 # Calculates the error in each magnitude bin.
 magnitudes_err_binned = []
 for b in bins[:-1]:
