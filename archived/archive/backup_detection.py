@@ -5,7 +5,7 @@ from matplotlib.patches import Ellipse
 import imageio.v3 as iio
 import cv2
 import json
-from frames import load_mask
+from archived.archive.frames import load_mask
 from maths import gaussian_2d, gaussian_2d_fit, gaussian_2d_n, gaussian_2d_n_fit
 
 # from scipy import ndimage
