@@ -1,11 +1,16 @@
+"""
+A module to find and plot the average SNR of each object per apparent magnitude.
+
+Packages: json, numpy, matplotlib
+"""
 import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-flux_file = "fluxes.json"
-snr_file = "snr.json"
-flux_err_file = "fluxes_err.json"
-shape_file = "shapes.json"
+flux_file = "data/fluxes.json"
+snr_file = "data/snr.json"
+flux_err_file = "data/fluxes_err.json"
+shape_file = "data/shapes.json"
 
 
 
@@ -25,8 +30,11 @@ with open(shape_file, "r") as file:
     shapes = json.load(file)
     file.close()
 
+
+
 ratios = []
 areas = []
+
 
 for x in shapes:
     if isinstance(x, float): #i.e nan
@@ -41,7 +49,6 @@ for x in shapes:
     else:
         areas.append(0)
         ratios.append(0)
-
 
 
 
@@ -74,7 +81,7 @@ fluxes_err = fluxes_err * gain / exposure_time
 magnitudes_err = - 2.5 / np.log(10) * fluxes_err / fluxes
 magnitudes_err = np.sqrt(magerr**2 + magnitudes_err**2)
 magnitudes = magzpt - 2.5 * np.log10(fluxes)
-#snr = 10 * np.log10(snr)
+#snr = 10 * np.log10(snr) #if decibel
 
 
 bins = np.arange(14, 24.5, 0.5)
@@ -95,8 +102,8 @@ for b in bins[:-1]:
         avg_snr.append(np.mean(snrs))
         seom.append(np.std(snrs)/np.sqrt(len(snrs)))
 
-# avg_snr = 10*np.log10(avg_snr)
-# seom = np.abs(10*np.log10(seom))
+# avg_snr = 10*np.log10(avg_snr) #decibel
+# seom = np.abs(10*np.log10(seom)) 
 plt.semilogy()
 #plt.plot(bins[:-1], avg_snr, "ko")
 plt.errorbar(bins[:-1], avg_snr, xerr=magnitudes_err_binned, yerr=seom, fmt="ko", capsize=4)
