@@ -42,11 +42,13 @@ This directory works as follows:
 
 
 To run:
+
     1. Run photometry.py
     2. Run classify.py
 
 
 Main Package Dependencis and Versions:
+    
     astropy                      8.0.1    
     imageio                      2.37.4              
     matplotlib-base              3.11.2   
@@ -56,4 +58,5 @@ Main Package Dependencis and Versions:
     scipy                        1.18.1
 
 Suitable Python Version:
+
     python                       3.14.8
