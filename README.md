@@ -5,38 +5,40 @@ This project is using object detection to count the number of astronomical objec
 
 This directory works as follows:
 
-Y3LabAstro
-    archived
-        old files 
-    CCfits_source
-        information about CC fits
-    data
-        the folder where the output data is loaded into
-    figures
-        figures generated during testing
-    figures_presentation
-        figures generated that are used in the presentation
-    Fits_Data
-        the input image and various alterations to it
 
-    analysis.py
-        calculates and plots the relation described above
-    header.py
-        allows for the header of the image to be viewed in an interactive window or by printing it
-    images.py
-        a module used to load in the image and perform some operations to it
-    maths.py
-        contains the customised mathematical functions used by other modules
-    photometry_testing.py 
-        tests assumptions that were used in the photometry pipeline
-    photometry.py
-        reads in the image, does the object detection, and produces the photometry
-    shape_classify.py
-        identifies the shape of each object based on the object's parameters and plots this against its magnitude
-    simulate.py
-        performs a simulation to see if our code works for artificial data
-    snr.py
-        plots the average SNR per apparent magnitude
+    Y3LabAstro
+
+        archived
+            old files 
+        CCfits_source
+            information about CC fits
+        data
+            the folder where the output data is loaded into
+        figures
+            figures generated during testing
+        figures_presentation
+            figures generated that are used in the presentation
+        Fits_Data
+            the input image and various alterations to it
+            
+        analysis.py
+            calculates and plots the relation described above
+        header.py
+            allows for the header of the image to be viewed in an interactive window or by printing it
+        images.py
+            a module used to load in the image and perform some operations to it
+        maths.py
+            contains the customised mathematical functions used by other modules
+        photometry_testing.py 
+            tests assumptions that were used in the photometry pipeline
+        photometry.py
+            reads in the image, does the object detection, and produces the photometry
+        shape_classify.py
+            identifies the shape of each object based on the object's parameters and plots this against its magnitude
+        simulate.py
+            performs a simulation to see if our code works for artificial data
+        snr.py
+            plots the average SNR per apparent magnitude
 
 
 To run:
